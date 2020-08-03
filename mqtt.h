@@ -111,11 +111,14 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
             switch_load = 1;
         } 
     } 
-    
-    
-
 }
 
+char* concat(char* str1, char* str2){
+  char* result;
+  strcpy(result, str1);
+  strcat(result, str2);
+  return result;
+}
 
 void mqtt_publish() {
   // publish via mqtt
@@ -131,41 +134,40 @@ void mqtt_publish() {
   
   // panel
   // 
-  //mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/panel/V"), live.l.pV /100.f);
-  mqtt_publish_f( sprintf(const_cast<char*>(mqtt_topic),"/panel/V"), live.l.pV /100.f);
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/panel/I"), live.l.pI /100.f);
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/panel/P"), live.l.pP /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic),"/panel/V"), live.l.pV /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/panel/I"), live.l.pI /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/panel/P"), live.l.pP /100.f);
   
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/battery/V"), live.l.bV /100.f);
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/battery/I"), live.l.bI /100.f);
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/battery/P"), live.l.bP /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/battery/V"), live.l.bV /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/battery/I"), live.l.bI /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/battery/P"), live.l.bP /100.f);
   
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/load/V"), live.l.lV /100.f);
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/load/I"), live.l.lI /100.f);
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/load/P"), live.l.lP /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/load/V"), live.l.lV /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/load/I"), live.l.lI /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/load/P"), live.l.lP /100.f);
 
 
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/co2reduction/t"), stats.s.c02Reduction/100.f);
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/battery/SOC"),   batterySOC/1.0f);
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/battery/netI"),  batteryCurrent/100.0f);
-  mqtt_publish_s( strcat(const_cast<char*>(mqtt_topic) , "/load/state"),    (char*) (loadState == 1? "on": "off") );  // pimatic state topic does not work with integers or floats ?!?
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/co2reduction/t"), stats.s.c02Reduction/100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/battery/SOC"),   batterySOC/1.0f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/battery/netI"),  batteryCurrent/100.0f);
+  mqtt_publish_s( concat(const_cast<char*>(mqtt_topic) , "/load/state"),    (char*) (loadState == 1? "on": "off") );  // pimatic state topic does not work with integers or floats ?!?
    
   
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/battery/minV"), stats.s.bVmin /100.f);
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/battery/maxV"), stats.s.bVmax /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/battery/minV"), stats.s.bVmin /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/battery/maxV"), stats.s.bVmax /100.f);
   
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/panel/minV"), stats.s.pVmin /100.f);
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/panel/maxV"), stats.s.pVmax /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/panel/minV"), stats.s.pVmin /100.f);
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/panel/maxV"), stats.s.pVmax /100.f);
   
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/energy/consumed_day"), stats.s.consEnerDay/100.f );
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/energy/consumed_all"), stats.s.consEnerTotal/100.f );
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/energy/consumed_day"), stats.s.consEnerDay/100.f );
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/energy/consumed_all"), stats.s.consEnerTotal/100.f );
 
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/energy/generated_day"), stats.s.genEnerDay/100.f );
-  mqtt_publish_f( strcat(const_cast<char*>(mqtt_topic) , "/energy/generated_all"),  stats.s.genEnerTotal/100.f );
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/energy/generated_day"), stats.s.genEnerDay/100.f );
+  mqtt_publish_f( concat(const_cast<char*>(mqtt_topic) , "/energy/generated_all"),  stats.s.genEnerTotal/100.f );
 
 
-  mqtt_publish_s( strcat(const_cast<char*>(mqtt_topic) , "/status/batt_volt"), batt_volt_status[status_batt.volt] );
-  mqtt_publish_s( strcat(const_cast<char*>(mqtt_topic) , "/status/batt_temp"), batt_temp_status[status_batt.temp] );
+  mqtt_publish_s( concat(const_cast<char*>(mqtt_topic) , "/status/batt_volt"), batt_volt_status[status_batt.volt] );
+  mqtt_publish_s( concat(const_cast<char*>(mqtt_topic) , "/status/batt_temp"), batt_temp_status[status_batt.temp] );
 
   //mqtt_publish_s( "solar/status/charger_input", charger_input_status[ charger_input ]  );
   mqtt_publish_s( strcat(const_cast<char*>(mqtt_topic) , "/status/charger_mode"),  charger_charging_status[ charger_mode ] );  
