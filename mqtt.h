@@ -1,14 +1,10 @@
 WiFiClient wifi_client;
 PubSubClient mqtt_client(wifi_client);
 
-const char* mqtt_username = "";
-const char* mqtt_password = "";
-const char* mqtt_topic = "solar";
-
 char mqtt_msg[64];
 char buf[256];
 long oldTime = 0;
-int do_update = 0, switch_load = 0, MQTT_Enable = 0;
+int do_update = 0u, switch_load = 0;
 bool loadState;
 
 void mqtt_publish_s( char* topic , char* msg ){
@@ -55,18 +51,18 @@ void mqtt_reconnect() {
     String clientId = "EpEver Solar Monitor";
     
     // Attempt to connect
-    if (mqtt_client.connect(clientId.c_str(),mqtt_username,mqtt_password)) {
+    if (mqtt_client.connect(clientId.c_str(),myConfig.mqtt_username,myConfig.mqtt_password)) {
       
       Serial.println("connected");
       
       // Once connected, publish an announcement...
-      mqtt_client.publish(mqtt_topic, "online");
+      mqtt_client.publish(myConfig.mqtt_topic, "online");
       do_update = 1;
       
       // ... and resubscribe
-      sprintf(buf,"%s/load/control",mqtt_topic);
+      sprintf(buf,"%s/load/control",myConfig.mqtt_topic);
       mqtt_client.subscribe(buf);
-      sprintf(buf,"%s/setting/sleep",mqtt_topic);
+      sprintf(buf,"%s/setting/sleep",myConfig.mqtt_topic);
       mqtt_client.subscribe(buf);
       
       
@@ -99,7 +95,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
 
     // solar/load/control
     //
-    sprintf(buf,"%s/load/control",mqtt_topic);
+    sprintf(buf,"%s/load/control",myConfig.mqtt_topic);
     if ( strncmp( topic, buf, strlen(buf) ) == 0 ){
 
         // Switch - but i can't seem to switch a coil directly here ?!?
@@ -128,63 +124,63 @@ void mqtt_publish() {
 
   // panel
   // 
-  sprintf(buf,"%s/panel/V",mqtt_topic);
+  sprintf(buf,"%s/panel/V",myConfig.mqtt_topic);
   mqtt_publish_f( buf, live.l.pV /100.f);
-  sprintf(buf,"%s/panel/I",mqtt_topic);
+  sprintf(buf,"%s/panel/I",myConfig.mqtt_topic);
   mqtt_publish_f( buf, live.l.pI /100.f);
-  sprintf(buf,"%s/panel/P",mqtt_topic);
+  sprintf(buf,"%s/panel/P",myConfig.mqtt_topic);
   mqtt_publish_f( buf, live.l.pP /100.f);
 
-  sprintf(buf,"%s/battery/V",mqtt_topic);
+  sprintf(buf,"%s/battery/V",myConfig.mqtt_topic);
   mqtt_publish_f( buf, live.l.bV /100.f);
-  sprintf(buf,"%s/battery/I",mqtt_topic);
+  sprintf(buf,"%s/battery/I",myConfig.mqtt_topic);
   mqtt_publish_f( buf, live.l.bI /100.f);
-  sprintf(buf,"%s/battery/P",mqtt_topic);
+  sprintf(buf,"%s/battery/P",myConfig.mqtt_topic);
   mqtt_publish_f( buf, live.l.bP /100.f);
   
-  sprintf(buf,"%s/load/V",mqtt_topic);  
+  sprintf(buf,"%s/load/V",myConfig.mqtt_topic);  
   mqtt_publish_f( buf, live.l.lV /100.f);
-  sprintf(buf,"%s/load/I",mqtt_topic);
+  sprintf(buf,"%s/load/I",myConfig.mqtt_topic);
   mqtt_publish_f( buf, live.l.lI /100.f);
-  sprintf(buf,"%s/load/P",mqtt_topic);
+  sprintf(buf,"%s/load/P",myConfig.mqtt_topic);
   mqtt_publish_f( buf, live.l.lP /100.f);
 
-  sprintf(buf,"%s/co2reduction/t",mqtt_topic);
+  sprintf(buf,"%s/co2reduction/t",myConfig.mqtt_topic);
   mqtt_publish_f( buf,  stats.s.c02Reduction/100.f);
-  sprintf(buf,"%s/battery/SOC",mqtt_topic);
+  sprintf(buf,"%s/battery/SOC",myConfig.mqtt_topic);
   mqtt_publish_f( buf,    batterySOC/1.0f);
-  sprintf(buf,"%s/battery/netI",mqtt_topic);
+  sprintf(buf,"%s/battery/netI",myConfig.mqtt_topic);
   mqtt_publish_f( buf,   batteryCurrent/100.0f);
-  sprintf(buf,"%s/load/state",mqtt_topic);
+  sprintf(buf,"%s/load/state",myConfig.mqtt_topic);
   mqtt_publish_s( buf,    (char*) (loadState == 1? "on": "off") );  // pimatic state topic does not work with integers or floats ?!?
    
-  sprintf(buf,"%s/battery/minV",mqtt_topic);
+  sprintf(buf,"%s/battery/minV",myConfig.mqtt_topic);
   mqtt_publish_f( buf,  stats.s.bVmin /100.f);
-  sprintf(buf,"%s/battery/maxV",mqtt_topic);
+  sprintf(buf,"%s/battery/maxV",myConfig.mqtt_topic);
   mqtt_publish_f( buf,  stats.s.bVmax /100.f);
   
-  sprintf(buf,"%s/panel/minV",mqtt_topic);
+  sprintf(buf,"%s/panel/minV",myConfig.mqtt_topic);
   mqtt_publish_f( buf,  stats.s.pVmin /100.f);
-  sprintf(buf,"%s/panel/maxV",mqtt_topic);
+  sprintf(buf,"%s/panel/maxV",myConfig.mqtt_topic);
   mqtt_publish_f( buf,  stats.s.pVmax /100.f);
 
-  sprintf(buf,"%s/energy/consumed_day",mqtt_topic);  
+  sprintf(buf,"%s/energy/consumed_day",myConfig.mqtt_topic);  
   mqtt_publish_f( buf,  stats.s.consEnerDay/100.f );
-  sprintf(buf,"%s/energy/consumed_all",mqtt_topic);
+  sprintf(buf,"%s/energy/consumed_all",myConfig.mqtt_topic);
   mqtt_publish_f( buf,  stats.s.consEnerTotal/100.f );
 
-  sprintf(buf,"%s/energy/generated_day",mqtt_topic);
+  sprintf(buf,"%s/energy/generated_day",myConfig.mqtt_topic);
   mqtt_publish_f( buf,  stats.s.genEnerDay/100.f );
-  sprintf(buf,"%s/energy/generated_all",mqtt_topic);
+  sprintf(buf,"%s/energy/generated_all",myConfig.mqtt_topic);
   mqtt_publish_f( buf,   stats.s.genEnerTotal/100.f );
 
-  sprintf(buf,"%s/status/batt_volt",mqtt_topic);
+  sprintf(buf,"%s/status/batt_volt",myConfig.mqtt_topic);
   mqtt_publish_s( buf, batt_volt_status[status_batt.volt] );
-  sprintf(buf,"%s/status/batt_temp",mqtt_topic);
+  sprintf(buf,"%s/status/batt_temp",myConfig.mqtt_topic);
   mqtt_publish_s( buf, batt_temp_status[status_batt.temp] );
 
   //sprintf(buf,"%s/status/charger_input",mqtt_topic);
   //mqtt_publish_s( buf, charger_input_status[ charger_input ]  );
-  sprintf(buf,"%s/status/charger_mode",mqtt_topic);
+  sprintf(buf,"%s/status/charger_mode",myConfig.mqtt_topic);
   mqtt_publish_s( buf,  charger_charging_status[ charger_mode ] );  
 }

@@ -71,6 +71,7 @@ uint8_t i, result;
 #define BATTERY_CAPACITY  0x9001  // Rated capacity of the battery in Ah
 #define HIGH_VOLTAGE_DISCONNECT 0x9003  //
 #define CHARGING_LIMIT_VOLT     0x9004  //
+#define EQ_CHARGE_VOLT          0x9006
 
   // datastructures, also for buffer to values conversion
   //
@@ -173,5 +174,7 @@ uint8_t i, result;
     "Boost",
     "Equlization"
   };
+
+  //
 
   

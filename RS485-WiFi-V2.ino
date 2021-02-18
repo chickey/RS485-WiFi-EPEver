@@ -4,6 +4,9 @@
 #include <ESP8266WiFi.h>
 #include <SoftwareSerial.h>
 #include <PubSubClient.h>
+#include "settings.h"
+#include <WiFiClient.h>
+#include <ESP8266HTTPClient.h>
 
 //#include <ModbusSlaveTCP.h>
 #include <ESPAsyncWebServer.h>     //Local WebServer used to serve the configuration portal
@@ -18,10 +21,8 @@ DNSServer dns;
 WiFiServer localServer(23);
 
 bool debug = false;
-const char* mqtt_server = "192.168.0.199";
-int mqtt_port = 1883;
 
-
+uint16_t button1;
 uint16_t Model;
 uint16_t StatusLabel;
 uint16_t BatterySOC;
@@ -41,9 +42,19 @@ uint16_t LoadSwitchstate;
 uint16_t Status;
 uint16_t TPPassthrough;
 uint16_t DeviceTemp;
-uint16_t GrafanaEN;
-uint16_t EmoncmsEN;
 uint16_t MQTTEN;
+uint16_t MQTTIP;
+uint16_t MQTTPORT;
+uint16_t MQTTUSER;
+uint16_t MQTTPASS;
+uint16_t MQTTTOPIC;
+
+uint16_t INFLUXDBIP;
+uint16_t INFLUXDBPORT;
+uint16_t INFLUXDBDB;
+uint16_t INFLUXDBUSER;
+uint16_t INFLUXDBPASS;
+uint16_t INFLUXDBEN;
 
 uint16_t OverVoltDist;
 uint16_t OverVoltRecon;
@@ -62,6 +73,7 @@ uint16_t BatteryDischargePercent;
 uint16_t BoostDuration;
 uint16_t EQDuration;
 uint16_t BatteryCapactity;
+uint16_t BatteryType;
 
 uint16_t Maxinputvolttoday;
 uint16_t Mininputvolttoday;
@@ -79,6 +91,17 @@ uint16_t Co2Reduction;
 uint16_t NetBatteryCurrent;
 uint16_t BatteryTemp;
 uint16_t AmbientTemp;
+
+uint16_t EQChargeVoltValue;
+
+void buttonCallback(Control *sender, int type) {
+  switch (type) {
+  case B_DOWN:
+    Serial.println("Saving");
+    WriteConfigToEEPROM();
+    break;
+  }
+}
 
 void OverVoltDisttxt(Control *sender, int type) {
   Serial.print("Text: ID: ");
@@ -204,7 +227,7 @@ void MQTTIPtxt(Control *sender, int type) {
   Serial.print(sender->id);
   Serial.print(", Value: ");
   Serial.println(sender->value);
-  mqtt_server = (sender->value).c_str();
+  strcpy(myConfig.mqtt_server,(sender->value).c_str());
 }
 
 void MQTTPorttxt(Control *sender, int type) {
@@ -212,7 +235,7 @@ void MQTTPorttxt(Control *sender, int type) {
   Serial.print(sender->id);
   Serial.print(", Value: ");
   Serial.println(sender->value);
-  mqtt_port = atoi ( (sender->value).c_str() );
+  myConfig.mqtt_port = atoi ( (sender->value).c_str() );
 }
 
 void MQTTUsertxt(Control *sender, int type) {
@@ -220,7 +243,7 @@ void MQTTUsertxt(Control *sender, int type) {
   Serial.print(sender->id);
   Serial.print(", Value: ");
   Serial.println(sender->value);
-  mqtt_username = (sender->value).c_str();
+  strcpy(myConfig.mqtt_username,(sender->value).c_str());
 }
 
 void MQTTPasstxt(Control *sender, int type) {
@@ -228,7 +251,7 @@ void MQTTPasstxt(Control *sender, int type) {
   Serial.print(sender->id);
   Serial.print(", Value: ");
   Serial.println(sender->value);
-  mqtt_password = (sender->value).c_str();
+  strcpy(myConfig.mqtt_password,(sender->value).c_str());
 }
 
 void MQTTTopictxt(Control *sender, int type) {
@@ -236,7 +259,7 @@ void MQTTTopictxt(Control *sender, int type) {
   Serial.print(sender->id);
   Serial.print(", Value: ");
   Serial.println(sender->value);
-  mqtt_topic = (sender->value).c_str();
+  strcpy(myConfig.mqtt_topic,(sender->value).c_str());
 }
 
 void InfluxDBIPtxt(Control *sender, int type) {
@@ -244,6 +267,7 @@ void InfluxDBIPtxt(Control *sender, int type) {
   Serial.print(sender->id);
   Serial.print(", Value: ");
   Serial.println(sender->value);
+  strcpy(myConfig.influxdb_host,(sender->value).c_str());
 }
 
 void InfluxDBPorttxt(Control *sender, int type) {
@@ -251,6 +275,7 @@ void InfluxDBPorttxt(Control *sender, int type) {
   Serial.print(sender->id);
   Serial.print(", Value: ");
   Serial.println(sender->value);
+  myConfig.influxdb_httpPort = atoi ( (sender->value).c_str() );
 }
 
 void InfluxDBtxt(Control *sender, int type) {
@@ -258,6 +283,7 @@ void InfluxDBtxt(Control *sender, int type) {
   Serial.print(sender->id);
   Serial.print(", Value: ");
   Serial.println(sender->value);
+  strcpy(myConfig.influxdb_database,(sender->value).c_str());
 }
 
 void InfluxDBUsertxt(Control *sender, int type) {
@@ -265,6 +291,7 @@ void InfluxDBUsertxt(Control *sender, int type) {
   Serial.print(sender->id);
   Serial.print(", Value: ");
   Serial.println(sender->value);
+  strcpy(myConfig.influxdb_user,(sender->value).c_str());
 }
 
 void InfluxDBPasstxt(Control *sender, int type) {
@@ -272,6 +299,7 @@ void InfluxDBPasstxt(Control *sender, int type) {
   Serial.print(sender->id);
   Serial.print(", Value: ");
   Serial.println(sender->value);
+  strcpy(myConfig.influxdb_password,(sender->value).c_str());
 }
 
 void BatteryTypeList(Control *sender, int type) {
@@ -319,14 +347,16 @@ void LoadSwitch(Control *sender, int value) {
   Serial.println(sender->id);
 }
 
-void GrafanaEnSwitch(Control *sender, int value) {
+void InfluxDBEnSwitch(Control *sender, int value) {
   switch (value) {
   case S_ACTIVE:
     Serial.print("Active:");
+    myConfig.influxdb_enabled = 1;
     break;
 
   case S_INACTIVE:
     Serial.print("Inactive");
+    myConfig.influxdb_enabled = 0;
     break;
   }
 
@@ -338,12 +368,12 @@ void MQTTEnSwitch(Control *sender, int value) {
   switch (value) {
   case S_ACTIVE:
     Serial.print("Active:");
-    MQTT_Enable = 1;
+    myConfig.MQTT_Enable = 1;
     break;
 
   case S_INACTIVE:
     Serial.print("Inactive");
-    MQTT_Enable = 0;
+    myConfig.MQTT_Enable = 0;
     break;
   }
 
@@ -376,8 +406,8 @@ void setup(void) {
   //  Create ESPUI interface tabs
   uint16_t tab1 = ESPUI.addControl( ControlType::Tab, "Settings 1", "Live Data" );
   uint16_t tab2 = ESPUI.addControl( ControlType::Tab, "Settings 2", "Historical Data" );
-  uint16_t tab3 = ESPUI.addControl( ControlType::Tab, "Settings 3", "Local Settings" );
-  uint16_t tab4 = ESPUI.addControl( ControlType::Tab, "Settings 4", "Solar Settings" );
+  uint16_t tab3 = ESPUI.addControl( ControlType::Tab, "Settings 3", "Settings" );
+  //uint16_t tab4 = ESPUI.addControl( ControlType::Tab, "Settings 4", "Solar Settings" );
   
   //  Add Live Data controls
   Status = ESPUI.addControl( ControlType::Label, "Device Status", "Charging", ControlColor::Emerald, tab1);
@@ -417,27 +447,27 @@ void setup(void) {
 
   
   // Add Local Settings controls
-  ESPUI.addControl( ControlType::Text, "InfluxDB IP:", "192.168.0.1", ControlColor::Emerald, tab3 ,&InfluxDBIPtxt);
-  ESPUI.addControl( ControlType::Text, "InfluxDB Port:", "8080", ControlColor::Emerald, tab3 ,&InfluxDBPorttxt);
-  ESPUI.addControl( ControlType::Text, "InfluxDB Database:", "Database", ControlColor::Emerald, tab3 ,&InfluxDBtxt);
-  ESPUI.addControl( ControlType::Text, "InfluxDB Username:", "Username", ControlColor::Emerald, tab3 ,&InfluxDBUsertxt);
-  ESPUI.addControl( ControlType::Text, "InfluxDB Password:", "Password", ControlColor::Emerald, tab3 ,&InfluxDBPasstxt);
-  GrafanaEN = ESPUI.addControl(ControlType::Switcher, "Enable Grafana", "", ControlColor::Alizarin,tab3, &GrafanaEnSwitch);  
+  INFLUXDBIP = ESPUI.addControl( ControlType::Text, "InfluxDB IP:", "192.168.0.254", ControlColor::Emerald, tab3 ,&InfluxDBIPtxt);
+  INFLUXDBPORT = ESPUI.addControl( ControlType::Text, "InfluxDB Port:", "8080", ControlColor::Emerald, tab3 ,&InfluxDBPorttxt);
+  INFLUXDBDB = ESPUI.addControl( ControlType::Text, "InfluxDB Database:", "powewall", ControlColor::Emerald, tab3 ,&InfluxDBtxt);
+  INFLUXDBUSER = ESPUI.addControl( ControlType::Text, "InfluxDB Username:", "username", ControlColor::Emerald, tab3 ,&InfluxDBUsertxt);
+  INFLUXDBPASS = ESPUI.addControl( ControlType::Text, "InfluxDB Password:", "password", ControlColor::Emerald, tab3 ,&InfluxDBPasstxt);
+  INFLUXDBEN = ESPUI.addControl(ControlType::Switcher, "Enable InfluxDB", "", ControlColor::Alizarin,tab3, &InfluxDBEnSwitch);  
 
-  ESPUI.addControl( ControlType::Text, "MQTT IP:", "192.168.0.1", ControlColor::Emerald, tab3 ,&MQTTIPtxt);
-  ESPUI.addControl( ControlType::Text, "MQTT Port:", "1883", ControlColor::Emerald, tab3 ,&MQTTPorttxt);
-  ESPUI.addControl( ControlType::Text, "MQTT Username:", "Username", ControlColor::Emerald, tab3 ,&MQTTUsertxt);
-  ESPUI.addControl( ControlType::Text, "MQTT Password:", "Password", ControlColor::Emerald, tab3 ,&MQTTPasstxt);
-  ESPUI.addControl( ControlType::Text, "MQTT Topic:", "solar", ControlColor::Emerald, tab3 ,&MQTTTopictxt);
+  MQTTIP = ESPUI.addControl( ControlType::Text, "MQTT IP:", "192.168.0.254", ControlColor::Emerald, tab3 ,&MQTTIPtxt);
+  MQTTPORT = ESPUI.addControl( ControlType::Text, "MQTT Port:", "1883", ControlColor::Emerald, tab3 ,&MQTTPorttxt);
+  MQTTUSER = ESPUI.addControl( ControlType::Text, "MQTT Username:", "username", ControlColor::Emerald, tab3 ,&MQTTUsertxt);
+  MQTTPASS = ESPUI.addControl( ControlType::Text, "MQTT Password:", "password", ControlColor::Emerald, tab3 ,&MQTTPasstxt);
+  MQTTTOPIC = ESPUI.addControl( ControlType::Text, "MQTT Topic:", "solar", ControlColor::Emerald, tab3 ,&MQTTTopictxt);
   MQTTEN = ESPUI.addControl(ControlType::Switcher, "Enable MQTT", "", ControlColor::Alizarin,tab3, &MQTTEnSwitch);
     
   LoadSwitchstate = ESPUI.addControl(ControlType::Switcher, "Load", "", ControlColor::Alizarin,tab3, &LoadSwitch);
     
   // Add Solar Settings controls
-  uint16_t select1 = ESPUI.addControl( ControlType::Select, "Battery Type", "", ControlColor::Emerald, tab4 ,&BatteryTypeList);
-  ESPUI.addControl( ControlType::Option, "Sealed", "Sealed", ControlColor::Alizarin, select1 );
-  ESPUI.addControl( ControlType::Option, "Gel", "Gel", ControlColor::Alizarin, select1 );
-  ESPUI.addControl( ControlType::Option, "Flooded", "Flooded", ControlColor::Alizarin, select1 );
+  /*uint16_t BatteryTypeControl = ESPUI.addControl( ControlType::Select, "Battery Type", "", ControlColor::Emerald, tab4 ,&BatteryTypeList);
+  ESPUI.addControl( ControlType::Option, "Sealed", "Sealed", ControlColor::Alizarin, BatteryTypeControl );
+  ESPUI.addControl( ControlType::Option, "Gel", "Gel", ControlColor::Alizarin, BatteryTypeControl );
+  ESPUI.addControl( ControlType::Option, "Flooded", "Flooded", ControlColor::Alizarin, BatteryTypeControl );
 
   uint16_t select2 = ESPUI.addControl( ControlType::Select, "Charging Mode", "", ControlColor::Emerald, tab4 ,&ChargingModeList);
   ESPUI.addControl( ControlType::Option, "VoltComp", "Volt Comp", ControlColor::Alizarin, select2 );
@@ -452,12 +482,12 @@ void setup(void) {
 
   ESPUI.addControl( ControlType::Text, "Over Volt Dist", "", ControlColor::Emerald, tab4 ,&OverVoltDisttxt);
   ESPUI.addControl( ControlType::Text, "Over Volt Reconnect", "", ControlColor::Emerald, tab4 ,&OverVoltRecontxt);
-  ESPUI.addControl( ControlType::Text, "EQ Charge Volt", "", ControlColor::Emerald, tab4 ,&EQChargeVolttxt);
+  EQChargeVolt = ESPUI.addControl( ControlType::Text, "EQ Charge Volt", "", ControlColor::Emerald, tab4 ,&EQChargeVolttxt);
   ESPUI.addControl( ControlType::Text, "Boost Charge Volt", "", ControlColor::Emerald, tab4 ,&BoostChargeVolttxt);
   ESPUI.addControl( ControlType::Text, "Float Chrage Volt", "", ControlColor::Emerald, tab4 ,&FloatChargeVolttxt);
   ESPUI.addControl( ControlType::Text, "Boost Reconnect Charge Volt", "", ControlColor::Emerald, tab4 ,&BoostReconChargeVolttxt);
   ESPUI.addControl( ControlType::Text, "Battery Charge Percentage", "", ControlColor::Emerald, tab4 ,&BatteryChargePercenttxt);
-  ESPUI.addControl( ControlType::Text, "Charge Limit Volt", "", ControlColor::Emerald, tab4 ,&ChargeLimitVolttxt);
+  ChargeLimitVolt = ESPUI.addControl( ControlType::Text, "Charge Limit Volt", "", ControlColor::Emerald, tab4 ,&ChargeLimitVolttxt);
   ESPUI.addControl( ControlType::Text, "Discharge Limit Volt", "", ControlColor::Emerald, tab4 ,&DischargeLimitVolttxt);
   ESPUI.addControl( ControlType::Text, "Low Volt Disconnect", "", ControlColor::Emerald, tab4 ,&LowVoltDisconnecttxt);
   ESPUI.addControl( ControlType::Text, "Low Volt Reconnect", "", ControlColor::Emerald, tab4 ,&LowVoltReconnecttxt);
@@ -467,18 +497,35 @@ void setup(void) {
   ESPUI.addControl( ControlType::Text, "Boost Duration", "", ControlColor::Emerald, tab4 ,&BoostDurationtxt);
   ESPUI.addControl( ControlType::Text, "EQ Duration", "", ControlColor::Emerald, tab4 ,&EQDurationtxt);
   ESPUI.addControl( ControlType::Text, "Battery Capacity", "", ControlColor::Emerald, tab4 ,&BatteryCapactitytxt);
-  
-
-    
-  //graphId = ESPUI.addControl( ControlType::Graph, "Status", "Charging", ControlColor::Wetasphalt, tab1);
+*/
+  button1 = ESPUI.addControl( ControlType::Button, "Save Settings", "Save", ControlColor::Peterriver, tab3, &buttonCallback );
   
   //first parameter is name of access point, second is the password
   AsyncWiFiManager wifiManager(&server,&dns);
-
   wifiManager.autoConnect("RS485-WiFi");
-  //ESPUI.setVerbosity(Verbosity::VerboseJSON);
   ESPUI.jsonInitialDocumentSize = 16000; // This is the default, adjust when you have too many widgets or options
   ESPUI.begin("RS485-WiFi");
+
+  LoadConfigFromEEPROM();
+}
+
+uint16_t ReadTegister(uint16_t Register) {
+  // Read register at the address passed in
+  //
+  delay(200);
+  node.clearResponseBuffer();
+  result = node.readInputRegisters(Register, 1);
+  if (result == node.ku8MBSuccess)  {
+    
+    EQChargeVoltValue = node.getResponseBuffer(0);
+    Serial.println(String(node.getResponseBuffer(0)));
+  } else  {
+    Serial.print("Miss read - "); 
+    Serial.print(Register);
+    Serial.print(", ret val:");
+    Serial.println(result, HEX);
+  }
+  return result;
 }
 
 void ReadValues() {  
@@ -543,12 +590,57 @@ void ReadValues() {
   result = node.readInputRegisters(BATTERY_TYPE, 1);
   if (result == node.ku8MBSuccess)  {
     
-    //batteryTYPE = node.getResponseBuffer(0);
+    BatteryType = node.getResponseBuffer(0);
     Serial.println(String(node.getResponseBuffer(0)));
   } else  {
     Serial.print("Miss read BATTERY_TYPE, ret val:");
     Serial.println(result, HEX);
   }
+
+  // EQ_CHARGE_VOLT
+  //
+  delay(200);
+  node.clearResponseBuffer();
+  result = node.readInputRegisters(EQ_CHARGE_VOLT, 1);
+  if (result == node.ku8MBSuccess)  {
+    
+    EQChargeVoltValue = node.getResponseBuffer(0);
+    Serial.println(String(node.getResponseBuffer(0)));
+  } else  {
+    Serial.print("Miss read EQ_CHARGE_VOLT, ret val:");
+    Serial.println(result, HEX);
+  }
+
+  // CHARGING_LIMIT_VOLT
+  //
+  delay(200);
+  node.clearResponseBuffer();
+  result = node.readInputRegisters(CHARGING_LIMIT_VOLT, 1);
+  if (result == node.ku8MBSuccess)  {
+    
+    ChargeLimitVolt = node.getResponseBuffer(0);
+    Serial.println(String(node.getResponseBuffer(0)));
+  } else  {
+    Serial.print("Miss read CHARGING_LIMIT_VOLT, ret val:");
+    Serial.println(result, HEX);
+  }
+  
+
+  
+  // Capacity
+  //
+  delay(200);
+  node.clearResponseBuffer();
+  result = node.readInputRegisters(BATTERY_CAPACITY, 1);
+  if (result == node.ku8MBSuccess)  {
+    
+    BatteryCapactity = node.getResponseBuffer(0);
+    Serial.println(String(node.getResponseBuffer(0)));
+  } else  {
+    Serial.print("Miss read BATTERY_CAPACITY, ret val:");
+    Serial.println(result, HEX);
+  }
+  
   
   // Battery SOC
   //
@@ -686,10 +778,42 @@ void debug_output(){
   Serial.println();
 }
 
+void load_switch() {
+  // Do the Switching of the Load here
+  //
+  if( switch_load == 1 ){
+    switch_load = 0;  
+    Serial.print("Switching Load ");
+    Serial.println( (loadState?"On":"Off") );
+
+    delay(200);
+    result = node.writeSingleCoil(0x0002, loadState);
+    if (result != node.ku8MBSuccess)  {
+      Serial.print("Miss write loadState, ret val:");
+      Serial.println(result, HEX);
+    } 
+  }
+}
+
 void loop(void) {
   // Print out to serial if debug is enabled.
   //
   if (debug) debug_output();
+
+  ESPUI.updateControlValue(MQTTIP , String(myConfig.mqtt_server));
+  ESPUI.updateControlValue(MQTTPORT , String(myConfig.mqtt_port));
+  ESPUI.updateControlValue(MQTTUSER , String(myConfig.mqtt_username));
+  ESPUI.updateControlValue(MQTTPASS , String(myConfig.mqtt_password));
+  ESPUI.updateControlValue(MQTTTOPIC , String(myConfig.mqtt_topic));
+  ESPUI.updateControlValue(MQTTEN , String(myConfig.MQTT_Enable));
+
+  ESPUI.updateControlValue(INFLUXDBIP , String(myConfig.influxdb_host));
+  ESPUI.updateControlValue(INFLUXDBPORT , String(myConfig.influxdb_httpPort));
+  ESPUI.updateControlValue(INFLUXDBUSER , String(myConfig.influxdb_user));
+  ESPUI.updateControlValue(INFLUXDBPASS , String(myConfig.influxdb_password));
+  ESPUI.updateControlValue(INFLUXDBDB , String(myConfig.influxdb_database));
+  ESPUI.updateControlValue(INFLUXDBEN , String(myConfig.influxdb_enabled));
+  
   // Read Values from Charge Controller
   ReadValues();
   
@@ -728,39 +852,38 @@ void loop(void) {
   ESPUI.updateControlValue(NetBatteryCurrent , String(batterySOC/1.0f)+"v");
   ESPUI.updateControlValue(BatteryTemp , String(batt_temp_status[status_batt.temp]));
   ESPUI.updateControlValue(AmbientTemp , String(batterySOC/1.0f)+"v");
+
+  //Update controller settings tab
+  //ESPUI.updateControlValue(EQChargeVolt , String(EQChargeVoltValue/100.0f)+"v");  
+  //ESPUI.updateControlValue(ChargeLimitVolt , String(ChargeLimitVolt/100.0f)+"v");  
+   
+  //Serial.print("EQChargeVolt : ");
+  //Serial.println(String(EQChargeVolt));
   
-  if (MQTT_Enable == 1) {
-  // establish/keep mqtt connection
-  //
-  if (!mqtt_client.connected())
-  { 
-    mqtt_client.setServer(mqtt_server, mqtt_port);
-    mqtt_client.setCallback(mqtt_callback);  
-    mqtt_reconnect(); 
+  //ESPUI.updateControlValue(BatteryTypeControl, String(batteryTYPE)); 
+  
+  if (myConfig.MQTT_Enable == 1) {
+    // establish/keep mqtt connection
+    //
+    if (!mqtt_client.connected())
+    { 
+      mqtt_client.setServer(myConfig.mqtt_server, myConfig.mqtt_port);
+      mqtt_client.setCallback(mqtt_callback);  
+      mqtt_reconnect(); 
+    }
+  
+    mqtt_publish();
+    mqtt_client.loop();
   }
-  
-  mqtt_publish();
-  mqtt_client.loop();
+
+    // establish/keep influxdb connection
+  if(myConfig.influxdb_enabled == 1) {
+    Influxdb_postData(); 
   }
   
   // power down MAX485_DE
   digitalWrite(MAX485_RE, 0); // low active
   digitalWrite(MAX485_DE, 0);
 
-  // Do the Switching of the Load here
-  //
-  if( switch_load == 1 ){
-    switch_load = 0;  
-    Serial.print("Switching Load ");
-    Serial.println( (loadState?"On":"Off") );
-
-    delay(200);
-    result = node.writeSingleCoil(0x0002, loadState);
-    if (result != node.ku8MBSuccess)  {
-      Serial.print("Miss write loadState, ret val:");
-      Serial.println(result, HEX);
-    } 
-  }
-
-  delay(1000);
+  delay(60000);
 }
