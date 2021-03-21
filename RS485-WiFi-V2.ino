@@ -12,6 +12,12 @@
 #include <ESPAsyncWebServer.h>     //Local WebServer used to serve the configuration portal
 #include <ESPAsyncWiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 
+#include <Updater.h>
+
+const char* OTA_INDEX PROGMEM
+    = R"=====(<!DOCTYPE html><html><head><meta charset=utf-8><title>OTA</title></head><body><div class="upload"><form method="POST" action="/ota" enctype="multipart/form-data"><input type="file" name="data" /><input type="submit" name="upload" value="Upload" title="Upload Files"></form></div></body></html>)=====";
+
+
 #include "config.h"
 #include "mqtt.h"
 #include "influxdb.h"
@@ -24,8 +30,9 @@ bool debug = false;
 
 uint16_t button1;
 uint16_t Model;
+uint16_t CCModel;
 uint16_t StatusLabel;
-uint16_t BatterySOC;
+uint16_t BatteryStateOC;
 uint16_t ChargingStatus;
 uint16_t SolarVoltage;
 uint16_t SolarAmps;
@@ -93,6 +100,69 @@ uint16_t BatteryTemp;
 uint16_t AmbientTemp;
 
 uint16_t EQChargeVoltValue;
+
+int period = 60000;
+unsigned long time_now = 0;
+
+void handleOTAUpload(AsyncWebServerRequest* request, String filename, size_t index, uint8_t* data, size_t len, bool final)
+{
+    if (!index)
+    {
+        Serial.printf("UploadStart: %s\n", filename.c_str());
+         // calculate sketch space required for the update, for ESP32 use the max constant
+#if defined(ESP32)
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN))
+#else
+        const uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+        if (!Update.begin(maxSketchSpace))
+#endif
+        {
+            // start with max available size
+            Update.printError(Serial);
+        }
+#if defined(ESP8266)
+        Update.runAsync(true);
+#endif
+    }
+
+    if (len)
+    {
+        Update.write(data, len);
+    }
+
+    // if the final flag is set then this is the last frame of data
+    if (final)
+    {
+        if (Update.end(true))
+        {
+            // true to set the size to the current progress
+            Serial.printf("Update Success: %ub written\nRebooting...\n", index + len);
+            ESP.restart();
+        }
+        else
+        {
+            Update.printError(Serial);
+        }
+    }
+}
+
+void setupGUI()
+{
+    ESPUI.begin("RS485-WiFi"); // It is important that ESPUI.begin(...) is called first so that ESPUI.server is initalized
+
+    ESPUI.server->on("/ota", 
+        HTTP_POST, 
+        [](AsyncWebServerRequest* request) { request->send(200); }, 
+        handleOTAUpload);
+
+    ESPUI.server->on("/ota", 
+        HTTP_GET, 
+        [](AsyncWebServerRequest* request) {
+            AsyncWebServerResponse* response = request->beginResponse_P(200, "text/html", OTA_INDEX);
+            request->send(response);
+        }
+    );
+}
 
 void buttonCallback(Control *sender, int type) {
   switch (type) {
@@ -336,13 +406,18 @@ void LoadSwitch(Control *sender, int value) {
   switch (value) {
   case S_ACTIVE:
     Serial.print("Active:");
+    loadState = true;
+    do_update = 1;
+    switch_load = 1;
     break;
 
   case S_INACTIVE:
     Serial.print("Inactive");
+    loadState = false;
+    do_update = 1;
+    switch_load = 1;
     break;
   }
-
   Serial.print(" ");
   Serial.println(sender->id);
 }
@@ -383,7 +458,6 @@ void MQTTEnSwitch(Control *sender, int value) {
 
 void setup(void) {
   Serial.begin(115200);
-  
   localServer.begin();
   localServer.setNoDelay(true);
   
@@ -410,9 +484,7 @@ void setup(void) {
   //uint16_t tab4 = ESPUI.addControl( ControlType::Tab, "Settings 4", "Solar Settings" );
   
   //  Add Live Data controls
-  Status = ESPUI.addControl( ControlType::Label, "Device Status", "Charging", ControlColor::Emerald, tab1);
-  LoadStatus = ESPUI.addControl( ControlType::Label, "Load Status", "2", ControlColor::Emerald, tab1);
-  DeviceTemp = ESPUI.addControl( ControlType::Label, "Device Temp", "0", ControlColor::Emerald, tab1);
+  //Status = ESPUI.addControl( ControlType::Label, "Device Status", "Charging", ControlColor::Emerald, tab1);
   SolarVoltage = ESPUI.addControl( ControlType::Label, "Solar Voltage", "0", ControlColor::Emerald, tab1);
   SolarAmps = ESPUI.addControl( ControlType::Label, "Solar Amps", "0", ControlColor::Emerald, tab1);
   SolarWattage = ESPUI.addControl( ControlType::Label, "Solar Wattage", "0", ControlColor::Emerald, tab1);
@@ -422,10 +494,13 @@ void setup(void) {
   LoadVoltage = ESPUI.addControl( ControlType::Label, "Load Voltage", "0", ControlColor::Emerald, tab1);
   LoadAmps = ESPUI.addControl( ControlType::Label, "Load Amps", "0", ControlColor::Emerald, tab1);
   LoadWattage = ESPUI.addControl( ControlType::Label, "Load Wattage", "0", ControlColor::Emerald, tab1);
-  BatterySOC = ESPUI.addControl( ControlType::Label, "Battery SOC", "0", ControlColor::Emerald, tab1);
+  BatteryStateOC = ESPUI.addControl( ControlType::Label, "Battery SOC", "0", ControlColor::Emerald, tab1);
   ChargingStatus = ESPUI.addControl( ControlType::Label, "Charging Status", "0", ControlColor::Emerald, tab1);
   BatteryStatus = ESPUI.addControl( ControlType::Label, "Battery Status", "4", ControlColor::Emerald, tab1);
-  Model = ESPUI.addControl( ControlType::Label, "Model", "EPever", ControlColor::Emerald, tab1);
+  BatteryTemp = ESPUI.addControl( ControlType::Label, "Battery temperature", "0", ControlColor::Emerald, tab1);
+  LoadStatus = ESPUI.addControl( ControlType::Label, "Load Status", "Off", ControlColor::Emerald, tab1);
+  DeviceTemp = ESPUI.addControl( ControlType::Label, "Device Temp", "0", ControlColor::Emerald, tab1);
+  //Model = ESPUI.addControl( ControlType::Label, "Model", "", ControlColor::Emerald, tab1);
   
   // Add Historical Data Controls
   Maxinputvolttoday = ESPUI.addControl( ControlType::Label, "Max input voltage today", "0", ControlColor::Emerald, tab2);
@@ -442,7 +517,6 @@ void setup(void) {
   TotalGeneratedEnergy = ESPUI.addControl( ControlType::Label, "Total generated energy", "0", ControlColor::Emerald, tab2);
   Co2Reduction = ESPUI.addControl( ControlType::Label, "Carbon dioxide reduction", "0", ControlColor::Emerald, tab2);
   //NetBatteryCurrent = ESPUI.addControl( ControlType::Label, "Net battery current", "0", ControlColor::Emerald, tab2);
-  BatteryTemp = ESPUI.addControl( ControlType::Label, "Battery temperature", "0", ControlColor::Emerald, tab2);
   //AmbientTemp = ESPUI.addControl( ControlType::Label, "Ambient temperature", "0", ControlColor::Emerald, tab2);
 
   
@@ -503,8 +577,10 @@ void setup(void) {
   //first parameter is name of access point, second is the password
   AsyncWiFiManager wifiManager(&server,&dns);
   wifiManager.autoConnect("RS485-WiFi");
+  wifiManager.setConfigPortalTimeout(180);
   ESPUI.jsonInitialDocumentSize = 16000; // This is the default, adjust when you have too many widgets or options
-  ESPUI.begin("RS485-WiFi");
+  //ESPUI.begin("RS485-WiFi");
+  setupGUI();
 
   LoadConfigFromEEPROM();
 }
@@ -693,7 +769,7 @@ void ReadValues() {
   result = node.readInputRegisters(CCMODEL, 1);
   if (result == node.ku8MBSuccess)  {
     
-    Model = node.getResponseBuffer(0);
+    CCModel = node.getResponseBuffer(0);
     
   } else  {
     Serial.print("Miss read Model, ret val:");
@@ -778,23 +854,6 @@ void debug_output(){
   Serial.println();
 }
 
-void load_switch() {
-  // Do the Switching of the Load here
-  //
-  if( switch_load == 1 ){
-    switch_load = 0;  
-    Serial.print("Switching Load ");
-    Serial.println( (loadState?"On":"Off") );
-
-    delay(200);
-    result = node.writeSingleCoil(0x0002, loadState);
-    if (result != node.ku8MBSuccess)  {
-      Serial.print("Miss write loadState, ret val:");
-      Serial.println(result, HEX);
-    } 
-  }
-}
-
 void loop(void) {
   // Print out to serial if debug is enabled.
   //
@@ -818,28 +877,28 @@ void loop(void) {
   ReadValues();
   
   //Update ESPUI Live Data components  
-  ESPUI.updateControlValue(Status, String(batterySOC/1.0f)+"v");
-  ESPUI.updateControlValue(LoadStatus , String(live.l.pI/100.f)+"a");
-  ESPUI.updateControlValue(DeviceTemp , String(0));
-  ESPUI.updateControlValue(SolarVoltage , String(live.l.pV/100.f)+"v");
-  ESPUI.updateControlValue(SolarAmps , String(live.l.pI/100.f)+"a");
+  ESPUI.updateControlValue(LoadStatus , String(loadState==1?" On":"Off"));
+  ESPUI.updateControlValue(DeviceTemp , String(batt_temp_status[status_batt.temp]));
+  ESPUI.updateControlValue(SolarVoltage , String(live.l.pV/100.f)+"V");
+  ESPUI.updateControlValue(SolarAmps , String(live.l.pI/100.f)+"A");
   ESPUI.updateControlValue(SolarWattage , String(live.l.pP/100.0f)+"w");
-  ESPUI.updateControlValue(BatteryVoltage  , String(live.l.bV/100.f)+"v");
-  ESPUI.updateControlValue(BatteryAmps , String(live.l.bI/100.f)+"a");
+  ESPUI.updateControlValue(BatteryVoltage  , String(live.l.bV/100.f)+"V");
+  ESPUI.updateControlValue(BatteryAmps , String(live.l.bI/100.f)+"A");
   ESPUI.updateControlValue(BatteryWattage , String(live.l.bP/100.0f)+"w");
-  ESPUI.updateControlValue(LoadVoltage , String(live.l.lV/100.f)+"v");
+  ESPUI.updateControlValue(LoadVoltage , String(live.l.lV/100.f)+"V");
   ESPUI.updateControlValue(LoadAmps , String(live.l.lI/100.f)+"a");
   ESPUI.updateControlValue(LoadWattage , String(live.l.lP/100.0f)+"w");
-  ESPUI.updateControlValue(BatterySOC , String(batterySOC/1.0f)+"v");
+  ESPUI.updateControlValue(BatteryStateOC , String(batterySOC/1.0f)+"V");
   ESPUI.updateControlValue(ChargingStatus , String(charger_charging_status[ charger_mode]));
-  ESPUI.updateControlValue(BatteryStatus , String(batterySOC/1.0f)+"v");
-  ESPUI.updateControlValue(Model, String("EPEver"));
+  ESPUI.updateControlValue(BatteryStatus , String(batt_volt_status[status_batt.volt]));
+  ESPUI.updateControlValue(BatteryTemp , String(batt_temp_status[status_batt.temp]));
+//  ESPUI.updateControlValue(Model, String(CCModel));
 
   //Update historical values
-  ESPUI.updateControlValue(Maxinputvolttoday, String(stats.s.pVmax/100.f)+"v");
-  ESPUI.updateControlValue(Mininputvolttoday , String(stats.s.pVmin/100.f)+"v");
-  ESPUI.updateControlValue(MaxBatteryvolttoday , String(stats.s.bVmax/100.f)+"v");
-  ESPUI.updateControlValue(MinBatteryvolttoday, String(stats.s.bVmin /100.f)+"v");
+  ESPUI.updateControlValue(Maxinputvolttoday, String(stats.s.pVmax/100.f)+"V");
+  ESPUI.updateControlValue(Mininputvolttoday , String(stats.s.pVmin/100.f)+"V");
+  ESPUI.updateControlValue(MaxBatteryvolttoday , String(stats.s.bVmax/100.f)+"V");
+  ESPUI.updateControlValue(MinBatteryvolttoday, String(stats.s.bVmin /100.f)+"V");
   ESPUI.updateControlValue(ConsumedEnergyToday , String(stats.s.consEnerDay/100.f)+" kWh");
   ESPUI.updateControlValue(ConsumedEnergyMonth , String(stats.s.consEnerMon/100.f)+" kWh");
   ESPUI.updateControlValue(ConsumedEngeryYear , String(stats.s.consEnerYear/100.f)+" kWh");
@@ -849,9 +908,8 @@ void loop(void) {
   ESPUI.updateControlValue(GeneratedEnergyYear , String(stats.s.genEnerYear/100.f)+" kWh");
   ESPUI.updateControlValue(TotalGeneratedEnergy , String(stats.s.genEnerTotal/100.f)+" kWh");
   ESPUI.updateControlValue(Co2Reduction , String(stats.s.c02Reduction/100.f)+"t");
-  ESPUI.updateControlValue(NetBatteryCurrent , String(batterySOC/1.0f)+"v");
-  ESPUI.updateControlValue(BatteryTemp , String(batt_temp_status[status_batt.temp]));
-  ESPUI.updateControlValue(AmbientTemp , String(batterySOC/1.0f)+"v");
+//  ESPUI.updateControlValue(NetBatteryCurrent , String(batterySOC/1.0f)+"v");
+//  ESPUI.updateControlValue(AmbientTemp , String(batterySOC/1.0f)+"v");
 
   //Update controller settings tab
   //ESPUI.updateControlValue(EQChargeVolt , String(EQChargeVoltValue/100.0f)+"v");  
@@ -861,7 +919,9 @@ void loop(void) {
   //Serial.println(String(EQChargeVolt));
   
   //ESPUI.updateControlValue(BatteryTypeControl, String(batteryTYPE)); 
-  
+  if(millis() >= time_now + period){
+  time_now += period;      
+      
   if (myConfig.MQTT_Enable == 1) {
     // establish/keep mqtt connection
     //
@@ -880,10 +940,24 @@ void loop(void) {
   if(myConfig.influxdb_enabled == 1) {
     Influxdb_postData(); 
   }
-  
+
+// Do the Switching of the Load here
+//
+  if( switch_load == 1 ){
+    switch_load = 0;  
+    Serial.print("Switching Load ");
+    Serial.println( (loadState?"On":"Off") );
+
+    delay(200);
+    result = node.writeSingleCoil(0x0002, loadState);
+    if (result != node.ku8MBSuccess)  {
+      Serial.print("Miss write loadState, ret val:");
+      Serial.println(result, HEX);
+    } 
+    
+  }
+  }
   // power down MAX485_DE
   digitalWrite(MAX485_RE, 0); // low active
   digitalWrite(MAX485_DE, 0);
-
-  delay(60000);
 }

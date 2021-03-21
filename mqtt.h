@@ -4,7 +4,7 @@ PubSubClient mqtt_client(wifi_client);
 char mqtt_msg[64];
 char buf[256];
 long oldTime = 0;
-int do_update = 0u, switch_load = 0;
+int do_update = 0, switch_load = 0;
 bool loadState;
 
 void mqtt_publish_s( char* topic , char* msg ){
