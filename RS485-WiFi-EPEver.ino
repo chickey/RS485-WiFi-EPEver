@@ -1,3 +1,22 @@
+/*
+ *    RS485 TO  WIFI ADAPTOR CODE
+ *    https://github.com/chickey/RS485-WiFi-EPEver
+ *    by Colin Hickey 2021
+ * 
+ *    This code is designed to work with the specific board designed by meself which is on sale at tindie and my own website
+ *    https://store.eplop.co.uk/product/epever-rs485-to-wifi-adaptor-new-revision/
+ *    https://www.tindie.com/products/plop211/epever-rs485-to-wifi-adaptor-v15/
+ * 
+ *    3D printed case is available at https://www.thingiverse.com/thing:4766788/files
+ *    
+ *    If your just using just the code and would like to help out a coffee is always appreciated paypal.me/colinmhickey
+ *    
+ *    A big thankyou to the following project for getting me on the right path https://github.com/glitterkitty/EpEverSolarMonitor 
+ *    I also couldn't have made this without the ESPUI project.
+*/
+ 
+
+
 #include <DNSServer.h>
 #include <ESPUI.h>
 #include <ModbusMaster.h>
@@ -8,7 +27,6 @@
 #include <WiFiClient.h>
 #include <ESP8266HTTPClient.h>
 
-//#include <ModbusSlaveTCP.h>
 #include <ESPAsyncWebServer.h>     //Local WebServer used to serve the configuration portal
 #include <ESPAsyncWiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 
@@ -481,10 +499,8 @@ void setup(void) {
   uint16_t tab1 = ESPUI.addControl( ControlType::Tab, "Settings 1", "Live Data" );
   uint16_t tab2 = ESPUI.addControl( ControlType::Tab, "Settings 2", "Historical Data" );
   uint16_t tab3 = ESPUI.addControl( ControlType::Tab, "Settings 3", "Settings" );
-  //uint16_t tab4 = ESPUI.addControl( ControlType::Tab, "Settings 4", "Solar Settings" );
   
   //  Add Live Data controls
-  //Status = ESPUI.addControl( ControlType::Label, "Device Status", "Charging", ControlColor::Emerald, tab1);
   SolarVoltage = ESPUI.addControl( ControlType::Label, "Solar Voltage", "0", ControlColor::Emerald, tab1);
   SolarAmps = ESPUI.addControl( ControlType::Label, "Solar Amps", "0", ControlColor::Emerald, tab1);
   SolarWattage = ESPUI.addControl( ControlType::Label, "Solar Wattage", "0", ControlColor::Emerald, tab1);
@@ -500,7 +516,6 @@ void setup(void) {
   BatteryTemp = ESPUI.addControl( ControlType::Label, "Battery temperature", "0", ControlColor::Emerald, tab1);
   LoadStatus = ESPUI.addControl( ControlType::Label, "Load Status", "Off", ControlColor::Emerald, tab1);
   DeviceTemp = ESPUI.addControl( ControlType::Label, "Device Temp", "0", ControlColor::Emerald, tab1);
-  //Model = ESPUI.addControl( ControlType::Label, "Model", "", ControlColor::Emerald, tab1);
   
   // Add Historical Data Controls
   Maxinputvolttoday = ESPUI.addControl( ControlType::Label, "Max input voltage today", "0", ControlColor::Emerald, tab2);
@@ -516,9 +531,6 @@ void setup(void) {
   GeneratedEnergyYear = ESPUI.addControl( ControlType::Label, "Generated energy this year", "0", ControlColor::Emerald, tab2);
   TotalGeneratedEnergy = ESPUI.addControl( ControlType::Label, "Total generated energy", "0", ControlColor::Emerald, tab2);
   Co2Reduction = ESPUI.addControl( ControlType::Label, "Carbon dioxide reduction", "0", ControlColor::Emerald, tab2);
-  //NetBatteryCurrent = ESPUI.addControl( ControlType::Label, "Net battery current", "0", ControlColor::Emerald, tab2);
-  //AmbientTemp = ESPUI.addControl( ControlType::Label, "Ambient temperature", "0", ControlColor::Emerald, tab2);
-
   
   // Add Local Settings controls
   INFLUXDBIP = ESPUI.addControl( ControlType::Text, "InfluxDB IP:", "192.168.0.254", ControlColor::Emerald, tab3 ,&InfluxDBIPtxt);
@@ -537,41 +549,6 @@ void setup(void) {
     
   LoadSwitchstate = ESPUI.addControl(ControlType::Switcher, "Load", "", ControlColor::Alizarin,tab3, &LoadSwitch);
     
-  // Add Solar Settings controls
-  /*uint16_t BatteryTypeControl = ESPUI.addControl( ControlType::Select, "Battery Type", "", ControlColor::Emerald, tab4 ,&BatteryTypeList);
-  ESPUI.addControl( ControlType::Option, "Sealed", "Sealed", ControlColor::Alizarin, BatteryTypeControl );
-  ESPUI.addControl( ControlType::Option, "Gel", "Gel", ControlColor::Alizarin, BatteryTypeControl );
-  ESPUI.addControl( ControlType::Option, "Flooded", "Flooded", ControlColor::Alizarin, BatteryTypeControl );
-
-  uint16_t select2 = ESPUI.addControl( ControlType::Select, "Charging Mode", "", ControlColor::Emerald, tab4 ,&ChargingModeList);
-  ESPUI.addControl( ControlType::Option, "VoltComp", "Volt Comp", ControlColor::Alizarin, select2 );
-  ESPUI.addControl( ControlType::Option, "SOC", "SOC", ControlColor::Alizarin, select2 );
-  
-  uint16_t select3 = ESPUI.addControl( ControlType::Select, "Rated Voltage Level", "", ControlColor::Emerald, tab4 ,&RatedVoltagelvlList);
-  ESPUI.addControl( ControlType::Option, "Auto", "Auto", ControlColor::Alizarin, select3 );
-  ESPUI.addControl( ControlType::Option, "12v", "12v", ControlColor::Alizarin, select3 );
-  ESPUI.addControl( ControlType::Option, "24v", "24v", ControlColor::Alizarin, select3 );
-  ESPUI.addControl( ControlType::Option, "36v", "36v", ControlColor::Alizarin, select3 );
-  ESPUI.addControl( ControlType::Option, "48v", "48v", ControlColor::Alizarin, select3 );
-
-  ESPUI.addControl( ControlType::Text, "Over Volt Dist", "", ControlColor::Emerald, tab4 ,&OverVoltDisttxt);
-  ESPUI.addControl( ControlType::Text, "Over Volt Reconnect", "", ControlColor::Emerald, tab4 ,&OverVoltRecontxt);
-  EQChargeVolt = ESPUI.addControl( ControlType::Text, "EQ Charge Volt", "", ControlColor::Emerald, tab4 ,&EQChargeVolttxt);
-  ESPUI.addControl( ControlType::Text, "Boost Charge Volt", "", ControlColor::Emerald, tab4 ,&BoostChargeVolttxt);
-  ESPUI.addControl( ControlType::Text, "Float Chrage Volt", "", ControlColor::Emerald, tab4 ,&FloatChargeVolttxt);
-  ESPUI.addControl( ControlType::Text, "Boost Reconnect Charge Volt", "", ControlColor::Emerald, tab4 ,&BoostReconChargeVolttxt);
-  ESPUI.addControl( ControlType::Text, "Battery Charge Percentage", "", ControlColor::Emerald, tab4 ,&BatteryChargePercenttxt);
-  ChargeLimitVolt = ESPUI.addControl( ControlType::Text, "Charge Limit Volt", "", ControlColor::Emerald, tab4 ,&ChargeLimitVolttxt);
-  ESPUI.addControl( ControlType::Text, "Discharge Limit Volt", "", ControlColor::Emerald, tab4 ,&DischargeLimitVolttxt);
-  ESPUI.addControl( ControlType::Text, "Low Volt Disconnect", "", ControlColor::Emerald, tab4 ,&LowVoltDisconnecttxt);
-  ESPUI.addControl( ControlType::Text, "Low Volt Reconnect", "", ControlColor::Emerald, tab4 ,&LowVoltReconnecttxt);
-  ESPUI.addControl( ControlType::Text, "Under Volt Warning Volt", "", ControlColor::Emerald, tab4 ,&UnderVoltWarningVolttxt);
-  ESPUI.addControl( ControlType::Text, "Under Volt Reconnect Volt", "", ControlColor::Emerald, tab4 ,&UnderVoltReconnectVolttxt);
-  ESPUI.addControl( ControlType::Text, "Battery Discharge Percentage", "", ControlColor::Emerald, tab4 ,&BatteryDischargePercenttxt);
-  ESPUI.addControl( ControlType::Text, "Boost Duration", "", ControlColor::Emerald, tab4 ,&BoostDurationtxt);
-  ESPUI.addControl( ControlType::Text, "EQ Duration", "", ControlColor::Emerald, tab4 ,&EQDurationtxt);
-  ESPUI.addControl( ControlType::Text, "Battery Capacity", "", ControlColor::Emerald, tab4 ,&BatteryCapactitytxt);
-*/
   button1 = ESPUI.addControl( ControlType::Button, "Save Settings", "Save", ControlColor::Peterriver, tab3, &buttonCallback );
   
   //first parameter is name of access point, second is the password
@@ -579,7 +556,7 @@ void setup(void) {
   wifiManager.autoConnect("RS485-WiFi");
   wifiManager.setConfigPortalTimeout(180);
   ESPUI.jsonInitialDocumentSize = 16000; // This is the default, adjust when you have too many widgets or options
-  //ESPUI.begin("RS485-WiFi");
+  //Start Web Interface with OTA enabled
   setupGUI();
 
   LoadConfigFromEEPROM();
@@ -792,13 +769,8 @@ void ReadValues() {
     status_batt.rated_volt = (temp  >> 15 ) & 0b1;
     
     temp = node.getResponseBuffer(1);
-    if (debug) Serial.print( "Chrg Flags : "); Serial.println(temp, HEX);
-   
-    //charger_input     = ( temp & 0b0000000000000000 ) >> 15 ;
+    if (debug) Serial.print( "Chrg Flags : "); Serial.println(temp, HEX); 
     charger_mode        = ( temp & 0b0000000000001100 ) >> 2 ;
-    //charger_input     = ( temp & 0b0000000000000000 ) >> 12 ;
-    //charger_operation = ( temp & 0b0000000000000000 ) >> 0 ;
-    
     if (debug) Serial.print( "charger_mode  : "); Serial.println( charger_mode );
     
   } else  {
@@ -888,11 +860,10 @@ void loop(void) {
   ESPUI.updateControlValue(LoadVoltage , String(live.l.lV/100.f)+"V");
   ESPUI.updateControlValue(LoadAmps , String(live.l.lI/100.f)+"a");
   ESPUI.updateControlValue(LoadWattage , String(live.l.lP/100.0f)+"w");
-  ESPUI.updateControlValue(BatteryStateOC , String(batterySOC/1.0f)+"V");
+  ESPUI.updateControlValue(BatteryStateOC , String(batterySOC/1.0f)+"%");
   ESPUI.updateControlValue(ChargingStatus , String(charger_charging_status[ charger_mode]));
   ESPUI.updateControlValue(BatteryStatus , String(batt_volt_status[status_batt.volt]));
   ESPUI.updateControlValue(BatteryTemp , String(batt_temp_status[status_batt.temp]));
-//  ESPUI.updateControlValue(Model, String(CCModel));
 
   //Update historical values
   ESPUI.updateControlValue(Maxinputvolttoday, String(stats.s.pVmax/100.f)+"V");
@@ -908,20 +879,11 @@ void loop(void) {
   ESPUI.updateControlValue(GeneratedEnergyYear , String(stats.s.genEnerYear/100.f)+" kWh");
   ESPUI.updateControlValue(TotalGeneratedEnergy , String(stats.s.genEnerTotal/100.f)+" kWh");
   ESPUI.updateControlValue(Co2Reduction , String(stats.s.c02Reduction/100.f)+"t");
-//  ESPUI.updateControlValue(NetBatteryCurrent , String(batterySOC/1.0f)+"v");
-//  ESPUI.updateControlValue(AmbientTemp , String(batterySOC/1.0f)+"v");
 
-  //Update controller settings tab
-  //ESPUI.updateControlValue(EQChargeVolt , String(EQChargeVoltValue/100.0f)+"v");  
-  //ESPUI.updateControlValue(ChargeLimitVolt , String(ChargeLimitVolt/100.0f)+"v");  
-   
-  //Serial.print("EQChargeVolt : ");
-  //Serial.println(String(EQChargeVolt));
-  
-  //ESPUI.updateControlValue(BatteryTypeControl, String(batteryTYPE)); 
+  //Check how long has elapsed
   if(millis() >= time_now + period){
   time_now += period;      
-      
+
   if (myConfig.MQTT_Enable == 1) {
     // establish/keep mqtt connection
     //
@@ -936,13 +898,12 @@ void loop(void) {
     mqtt_client.loop();
   }
 
-    // establish/keep influxdb connection
+  // establish/keep influxdb connection
   if(myConfig.influxdb_enabled == 1) {
     Influxdb_postData(); 
   }
 
 // Do the Switching of the Load here
-//
   if( switch_load == 1 ){
     switch_load = 0;  
     Serial.print("Switching Load ");
@@ -957,6 +918,7 @@ void loop(void) {
     
   }
   }
+  
   // power down MAX485_DE
   digitalWrite(MAX485_RE, 0); // low active
   digitalWrite(MAX485_DE, 0);

@@ -1,4 +1,3 @@
-
 void Influxdb_postData() {
   String poststring;
   String poststring1;
