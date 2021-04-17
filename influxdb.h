@@ -5,7 +5,7 @@ void Influxdb_postData() {
 
 
   //Construct URL for the influxdb
-  String url = "http://" + String(myConfig.influxdb_host) + ":" + myConfig.influxdb_httpPort + "/write?db=" + String(myConfig.influxdb_database);// + "&u=" + String(myConfig.influxdb_user) + "&p=" + String(myConfig.influxdb_password);
+  String url = "http://" + String(myConfig.influxdb_host) + ":" + myConfig.influxdb_httpPort + "/write?db=" + String(myConfig.influxdb_database) + "&u=" + String(myConfig.influxdb_user) + "&p=" + String(myConfig.influxdb_password);
   
   //Output to grafana using a http post
   poststring = poststring + "Panel-Voltage value=" + String(live.l.pV /100.f) + "\n";
