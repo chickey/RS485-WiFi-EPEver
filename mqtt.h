@@ -51,7 +51,7 @@ void mqtt_reconnect() {
     String clientId = "EpEver Solar Monitor";
     
     // Attempt to connect
-    if (mqtt_client.connect(clientId.c_str(),myConfig.mqtt_username,myConfig.mqtt_password)) {
+    if (mqtt_client.connect(clientId.c_str(),myConfig.mqtt_username,myConfig.mqtt_password,myConfig.mqtt_topic,0,true,"offline")) {
       
       Serial.println("connected");
       
