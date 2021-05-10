@@ -28,7 +28,7 @@
 #include <ESP8266HTTPClient.h>
 
 #include <ESPAsyncWebServer.h>     //Local WebServer used to serve the configuration portal
-#include <ESPAsyncWiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
+#include <ESPAsync_WiFiManager.h>         // switched from tapzu to https://github.com/khoih-prog/ESPAsync_WiFiManager
 
 #include <Updater.h>
 
@@ -550,9 +550,8 @@ void setup(void) {
   LoadSwitchstate = ESPUI.addControl(ControlType::Switcher, "Load", "", ControlColor::Alizarin,tab3, &LoadSwitch);
     
   button1 = ESPUI.addControl( ControlType::Button, "Save Settings", "Save", ControlColor::Peterriver, tab3, &buttonCallback );
-  
-  //first parameter is name of access point, second is the password
-  AsyncWiFiManager wifiManager(&server,&dns);
+
+  ESPAsync_WiFiManager wifiManager(&server,&dns);
   wifiManager.autoConnect("RS485-WiFi");
   wifiManager.setConfigPortalTimeout(180);
   ESPUI.jsonInitialDocumentSize = 16000; // This is the default, adjust when you have too many widgets or options
