@@ -26,6 +26,9 @@ struct eeprom_settings {
   char influxdb_database[32 + 1];
   char influxdb_user[32 + 1];
   char influxdb_password[32 + 1];
+
+  int Device_ID;
+  int Device_BAUD;
 };
 
 extern eeprom_settings myConfig;

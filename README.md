@@ -24,7 +24,7 @@ I am also using the ESPUI project which without this I wouldn't have had the doo
 
 - Tracer AN Series
 
-  - Tracer 4210AN 
+  - 2210AN, 3210AN and 4210AN 
 
 - TRITON Series with RS485 module
 

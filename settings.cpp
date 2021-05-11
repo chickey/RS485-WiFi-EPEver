@@ -86,5 +86,8 @@ void FactoryResetSettings() {
   myConfig.MQTT_Enable=false;
   myConfig.mqtt_port = 1883;
 
+  myConfig.Device_ID=1;
+  myConfig.Device_BAUD=115200;
+  
   WriteConfigToEEPROM();
 }

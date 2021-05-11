@@ -13,9 +13,10 @@
  *    
  *    A big thankyou to the following project for getting me on the right path https://github.com/glitterkitty/EpEverSolarMonitor 
  *    I also couldn't have made this without the ESPUI project.
+ *    
+ *    Version 0.5
+ *    
 */
- 
-
 
 #include <DNSServer.h>
 #include <ESPUI.h>
@@ -28,7 +29,7 @@
 #include <ESP8266HTTPClient.h>
 
 #include <ESPAsyncWebServer.h>     //Local WebServer used to serve the configuration portal
-#include <ESPAsync_WiFiManager.h>         // switched from tapzu to https://github.com/khoih-prog/ESPAsync_WiFiManager
+#include <ESPAsyncWiFiManager.h>         // switched from tapzu to https://github.com/khoih-prog/ESPAsync_WiFiManager
 
 #include <Updater.h>
 
@@ -42,11 +43,13 @@ const char* OTA_INDEX PROGMEM
 
 AsyncWebServer server(80);
 DNSServer dns;
-WiFiServer localServer(23);
 
 bool debug = false;
 
-uint16_t button1;
+uint16_t savestatustxt;
+uint16_t Abouttxt;
+uint16_t SaveButton;
+uint16_t RebootButton;
 uint16_t Model;
 uint16_t CCModel;
 uint16_t StatusLabel;
@@ -73,6 +76,9 @@ uint16_t MQTTPORT;
 uint16_t MQTTUSER;
 uint16_t MQTTPASS;
 uint16_t MQTTTOPIC;
+
+uint16_t DEVICEID;
+uint16_t DEVICEBAUD;
 
 uint16_t INFLUXDBIP;
 uint16_t INFLUXDBPORT;
@@ -166,7 +172,7 @@ void handleOTAUpload(AsyncWebServerRequest* request, String filename, size_t ind
 
 void setupGUI()
 {
-    ESPUI.begin("RS485-WiFi"); // It is important that ESPUI.begin(...) is called first so that ESPUI.server is initalized
+    ESPUI.begin("RS485-WiFi v0.5"); // It is important that ESPUI.begin(...) is called first so that ESPUI.server is initalized
 
     ESPUI.server->on("/ota", 
         HTTP_POST, 
@@ -182,11 +188,21 @@ void setupGUI()
     );
 }
 
-void buttonCallback(Control *sender, int type) {
+void SaveButtontxt(Control *sender, int type) {
   switch (type) {
   case B_DOWN:
     Serial.println("Saving");
     WriteConfigToEEPROM();
+    ESPUI.updateControlValue(savestatustxt , "Changes Saved");
+    break;
+  }
+}
+
+void RebootButtontxt(Control *sender, int type) {
+  switch (type) {
+  case B_DOWN:
+    Serial.println("Rebooting");
+    ESP.restart();
     break;
   }
 }
@@ -310,12 +326,32 @@ void BatteryCapactitytxt(Control *sender, int type) {
   Serial.println(sender->value);
 }
 
+void DEVICEIDtxt(Control *sender, int type) {
+  Serial.print("Text: ID: ");
+  Serial.print(sender->id);
+  Serial.print(", Value: ");
+  Serial.println(sender->value);
+  myConfig.Device_ID = atoi ( (sender->value).c_str() );
+  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
+}
+
+void DEVICEBAUDtxt(Control *sender, int type) {
+  Serial.print("Text: ID: ");
+  Serial.print(sender->id);
+  Serial.print(", Value: ");
+  Serial.println(sender->value);
+  myConfig.Device_BAUD = atoi ( (sender->value).c_str() );
+  Serial.begin(myConfig.Device_BAUD);
+  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
+}
+
 void MQTTIPtxt(Control *sender, int type) {
   Serial.print("Text: ID: ");
   Serial.print(sender->id);
   Serial.print(", Value: ");
   Serial.println(sender->value);
   strcpy(myConfig.mqtt_server,(sender->value).c_str());
+  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
 }
 
 void MQTTPorttxt(Control *sender, int type) {
@@ -324,6 +360,7 @@ void MQTTPorttxt(Control *sender, int type) {
   Serial.print(", Value: ");
   Serial.println(sender->value);
   myConfig.mqtt_port = atoi ( (sender->value).c_str() );
+  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");  
 }
 
 void MQTTUsertxt(Control *sender, int type) {
@@ -332,6 +369,7 @@ void MQTTUsertxt(Control *sender, int type) {
   Serial.print(", Value: ");
   Serial.println(sender->value);
   strcpy(myConfig.mqtt_username,(sender->value).c_str());
+  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
 }
 
 void MQTTPasstxt(Control *sender, int type) {
@@ -340,6 +378,7 @@ void MQTTPasstxt(Control *sender, int type) {
   Serial.print(", Value: ");
   Serial.println(sender->value);
   strcpy(myConfig.mqtt_password,(sender->value).c_str());
+  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
 }
 
 void MQTTTopictxt(Control *sender, int type) {
@@ -348,6 +387,7 @@ void MQTTTopictxt(Control *sender, int type) {
   Serial.print(", Value: ");
   Serial.println(sender->value);
   strcpy(myConfig.mqtt_topic,(sender->value).c_str());
+  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
 }
 
 void InfluxDBIPtxt(Control *sender, int type) {
@@ -356,6 +396,7 @@ void InfluxDBIPtxt(Control *sender, int type) {
   Serial.print(", Value: ");
   Serial.println(sender->value);
   strcpy(myConfig.influxdb_host,(sender->value).c_str());
+  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
 }
 
 void InfluxDBPorttxt(Control *sender, int type) {
@@ -364,6 +405,7 @@ void InfluxDBPorttxt(Control *sender, int type) {
   Serial.print(", Value: ");
   Serial.println(sender->value);
   myConfig.influxdb_httpPort = atoi ( (sender->value).c_str() );
+  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
 }
 
 void InfluxDBtxt(Control *sender, int type) {
@@ -372,6 +414,7 @@ void InfluxDBtxt(Control *sender, int type) {
   Serial.print(", Value: ");
   Serial.println(sender->value);
   strcpy(myConfig.influxdb_database,(sender->value).c_str());
+  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
 }
 
 void InfluxDBUsertxt(Control *sender, int type) {
@@ -380,6 +423,7 @@ void InfluxDBUsertxt(Control *sender, int type) {
   Serial.print(", Value: ");
   Serial.println(sender->value);
   strcpy(myConfig.influxdb_user,(sender->value).c_str());
+  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
 }
 
 void InfluxDBPasstxt(Control *sender, int type) {
@@ -388,6 +432,7 @@ void InfluxDBPasstxt(Control *sender, int type) {
   Serial.print(", Value: ");
   Serial.println(sender->value);
   strcpy(myConfig.influxdb_password,(sender->value).c_str());
+  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
 }
 
 void BatteryTypeList(Control *sender, int type) {
@@ -475,31 +520,15 @@ void MQTTEnSwitch(Control *sender, int value) {
 }
 
 void setup(void) {
-  Serial.begin(115200);
-  localServer.begin();
-  localServer.setNoDelay(true);
-  
-  // Connect D0 to RST to wake up
-  pinMode(D0, WAKEUP_PULLUP);
-
-  // init modbus in receive mode
-  pinMode(MAX485_RE, OUTPUT);
-  pinMode(MAX485_DE, OUTPUT);
-  digitalWrite(MAX485_RE, 0);
-  digitalWrite(MAX485_DE, 0);
-    
-  // EPEver Device ID 1
-  node.begin(1, Serial);
-    
-  // modbus callbacks
-  node.preTransmission(preTransmission);
-  node.postTransmission(postTransmission);
+  if (!LoadConfigFromEEPROM())
+    FactoryResetSettings();
     
   //  Create ESPUI interface tabs
   uint16_t tab1 = ESPUI.addControl( ControlType::Tab, "Settings 1", "Live Data" );
   uint16_t tab2 = ESPUI.addControl( ControlType::Tab, "Settings 2", "Historical Data" );
   uint16_t tab3 = ESPUI.addControl( ControlType::Tab, "Settings 3", "Settings" );
-  
+  uint16_t tab4 = ESPUI.addControl( ControlType::Tab, "Settings 4", "About" );
+
   //  Add Live Data controls
   SolarVoltage = ESPUI.addControl( ControlType::Label, "Solar Voltage", "0", ControlColor::Emerald, tab1);
   SolarAmps = ESPUI.addControl( ControlType::Label, "Solar Amps", "0", ControlColor::Emerald, tab1);
@@ -546,19 +575,44 @@ void setup(void) {
   MQTTPASS = ESPUI.addControl( ControlType::Text, "MQTT Password:", "password", ControlColor::Emerald, tab3 ,&MQTTPasstxt);
   MQTTTOPIC = ESPUI.addControl( ControlType::Text, "MQTT Topic:", "solar", ControlColor::Emerald, tab3 ,&MQTTTopictxt);
   MQTTEN = ESPUI.addControl(ControlType::Switcher, "Enable MQTT", "", ControlColor::Alizarin,tab3, &MQTTEnSwitch);
+
+  DEVICEID = ESPUI.addControl( ControlType::Text, "Device ID:", "1", ControlColor::Emerald, tab3 ,&DEVICEIDtxt);
+  DEVICEBAUD = ESPUI.addControl( ControlType::Text, "BAUD Rate:", "115200", ControlColor::Emerald, tab3 ,&DEVICEBAUDtxt);
     
   LoadSwitchstate = ESPUI.addControl(ControlType::Switcher, "Load", "", ControlColor::Alizarin,tab3, &LoadSwitch);
-    
-  button1 = ESPUI.addControl( ControlType::Button, "Save Settings", "Save", ControlColor::Peterriver, tab3, &buttonCallback );
 
-  ESPAsync_WiFiManager wifiManager(&server,&dns);
+  
+  RebootButton = ESPUI.addControl( ControlType::Button, "Reboot", "Reboot", ControlColor::Peterriver, tab3, &RebootButtontxt );
+  SaveButton = ESPUI.addControl( ControlType::Button, "Save Settings", "Save", ControlColor::Peterriver, tab3, &SaveButtontxt );
+  savestatustxt = ESPUI.addControl( ControlType::Label, "Status:", "Changes Saved", ControlColor::Turquoise, tab3 );
+
+  Abouttxt = ESPUI.addControl( ControlType::Label, "", "RS485 TO  WIFI ADAPTOR CODE<br><br>https://github.com/chickey/RS485-WiFi-EPEver<br><br>by Colin Hickey 2021<br><br>I'm always up for suggestions either via github or if you wish to chat with like minded people and pick people's brains on their setups i have setup a discord server<br><br>https://discord.gg/kBDmrzE", ControlColor::Turquoise,tab4 );
+  
+  Serial.begin(myConfig.Device_BAUD);
+  // Connect D0 to RST to wake up
+  pinMode(D0, WAKEUP_PULLUP);
+
+  // init modbus in receive mode
+  pinMode(MAX485_RE, OUTPUT);
+  pinMode(MAX485_DE, OUTPUT);
+  digitalWrite(MAX485_RE, 0);
+  digitalWrite(MAX485_DE, 0);
+
+
+  // EPEver Device ID and Baud Rate
+  node.begin(myConfig.Device_ID, Serial);
+    
+  // modbus callbacks
+  node.preTransmission(preTransmission);
+  node.postTransmission(postTransmission);
+
+
+  AsyncWiFiManager wifiManager(&server,&dns);
   wifiManager.autoConnect("RS485-WiFi");
   wifiManager.setConfigPortalTimeout(180);
   ESPUI.jsonInitialDocumentSize = 16000; // This is the default, adjust when you have too many widgets or options
   //Start Web Interface with OTA enabled
   setupGUI();
-
-  LoadConfigFromEEPROM();
 }
 
 uint16_t ReadTegister(uint16_t Register) {
@@ -830,6 +884,7 @@ void loop(void) {
   //
   if (debug) debug_output();
 
+  
   ESPUI.updateControlValue(MQTTIP , String(myConfig.mqtt_server));
   ESPUI.updateControlValue(MQTTPORT , String(myConfig.mqtt_port));
   ESPUI.updateControlValue(MQTTUSER , String(myConfig.mqtt_username));
@@ -843,6 +898,9 @@ void loop(void) {
   ESPUI.updateControlValue(INFLUXDBPASS , String(myConfig.influxdb_password));
   ESPUI.updateControlValue(INFLUXDBDB , String(myConfig.influxdb_database));
   ESPUI.updateControlValue(INFLUXDBEN , String(myConfig.influxdb_enabled));
+
+  ESPUI.updateControlValue(DEVICEID , String(myConfig.Device_ID));
+  ESPUI.updateControlValue(DEVICEBAUD , String(myConfig.Device_BAUD));
   
   // Read Values from Charge Controller
   ReadValues();
