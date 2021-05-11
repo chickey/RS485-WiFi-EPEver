@@ -89,9 +89,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
     }
     Serial.println();
 
-    payload[length] = '\0';
-
-    
+    payload[length] = '\0';  
 
     // solar/load/control
     //
@@ -110,6 +108,13 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
             switch_load = 1;
         } 
     } 
+}
+
+void mqtt_loadpublish() {
+  Serial.println("Publishing load: ");
+  
+  sprintf(buf,"%s/load/state",myConfig.mqtt_topic);
+  mqtt_publish_s( buf,    (char*) (loadState == 1? "on": "off") );  // pimatic state topic does not work with integers or floats ?!?
 }
 
 void mqtt_publish() {

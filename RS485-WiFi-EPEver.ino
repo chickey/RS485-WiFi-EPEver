@@ -14,7 +14,7 @@
  *    A big thankyou to the following project for getting me on the right path https://github.com/glitterkitty/EpEverSolarMonitor 
  *    I also couldn't have made this without the ESPUI project.
  *    
- *    Version 0.5
+ *    Version 0.51
  *    
 */
 
@@ -24,7 +24,6 @@
 #include <ESP8266WiFi.h>
 #include <SoftwareSerial.h>
 #include <PubSubClient.h>
-#include "settings.h"
 #include <WiFiClient.h>
 #include <ESP8266HTTPClient.h>
 
@@ -36,490 +35,22 @@
 const char* OTA_INDEX PROGMEM
     = R"=====(<!DOCTYPE html><html><head><meta charset=utf-8><title>OTA</title></head><body><div class="upload"><form method="POST" action="/ota" enctype="multipart/form-data"><input type="file" name="data" /><input type="submit" name="upload" value="Upload" title="Upload Files"></form></div></body></html>)=====";
 
-
+#include "settings.h"
 #include "config.h"
 #include "mqtt.h"
 #include "influxdb.h"
+#include "gui.h"
 
 AsyncWebServer server(80);
 DNSServer dns;
+ModbusMaster node;   // instantiate ModbusMaster object
 
 bool debug = false;
-
-uint16_t savestatustxt;
-uint16_t Abouttxt;
-uint16_t SaveButton;
-uint16_t RebootButton;
-uint16_t Model;
-uint16_t CCModel;
-uint16_t StatusLabel;
-uint16_t BatteryStateOC;
-uint16_t ChargingStatus;
-uint16_t SolarVoltage;
-uint16_t SolarAmps;
-uint16_t SolarWattage;
-uint16_t BatteryVoltage;
-uint16_t BatteryAmps;
-uint16_t BatteryWattage;
-uint16_t BatteryStatus;
-uint16_t LoadVoltage;
-uint16_t LoadAmps;
-uint16_t LoadWattage;
-uint16_t LoadStatus;
-uint16_t LoadSwitchstate;
-uint16_t Status;
-uint16_t TPPassthrough;
-uint16_t DeviceTemp;
-uint16_t MQTTEN;
-uint16_t MQTTIP;
-uint16_t MQTTPORT;
-uint16_t MQTTUSER;
-uint16_t MQTTPASS;
-uint16_t MQTTTOPIC;
-
-uint16_t DEVICEID;
-uint16_t DEVICEBAUD;
-
-uint16_t INFLUXDBIP;
-uint16_t INFLUXDBPORT;
-uint16_t INFLUXDBDB;
-uint16_t INFLUXDBUSER;
-uint16_t INFLUXDBPASS;
-uint16_t INFLUXDBEN;
-
-uint16_t OverVoltDist;
-uint16_t OverVoltRecon;
-uint16_t EQChargeVolt;
-uint16_t BoostChargeVolt;
-uint16_t FloatChargeVolt;
-uint16_t BoostReconChargeVolt;
-uint16_t BatteryChargePercent;
-uint16_t ChargeLimitVolt;
-uint16_t DischargeLimitVolt;
-uint16_t LowVoltDisconnect;
-uint16_t LowVoltReconnect;
-uint16_t UnderVoltWarningVolt;
-uint16_t UnderVoltReconnectVolt;
-uint16_t BatteryDischargePercent;
-uint16_t BoostDuration;
-uint16_t EQDuration;
-uint16_t BatteryCapactity;
-uint16_t BatteryType;
-
-uint16_t Maxinputvolttoday;
-uint16_t Mininputvolttoday;
-uint16_t MaxBatteryvolttoday;
-uint16_t MinBatteryvolttoday;
-uint16_t ConsumedEnergyToday;
-uint16_t ConsumedEnergyMonth;
-uint16_t ConsumedEngeryYear;
-uint16_t TotalConsumedEnergy;
-uint16_t GeneratedEnergyToday;
-uint16_t GeneratedEnergyMonth;
-uint16_t GeneratedEnergyYear;
-uint16_t TotalGeneratedEnergy;
-uint16_t Co2Reduction;
-uint16_t NetBatteryCurrent;
-uint16_t BatteryTemp;
-uint16_t AmbientTemp;
-
-uint16_t EQChargeVoltValue;
-
 int period = 60000;
 unsigned long time_now = 0;
 
-void handleOTAUpload(AsyncWebServerRequest* request, String filename, size_t index, uint8_t* data, size_t len, bool final)
-{
-    if (!index)
-    {
-        Serial.printf("UploadStart: %s\n", filename.c_str());
-         // calculate sketch space required for the update, for ESP32 use the max constant
-#if defined(ESP32)
-        if (!Update.begin(UPDATE_SIZE_UNKNOWN))
-#else
-        const uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-        if (!Update.begin(maxSketchSpace))
-#endif
-        {
-            // start with max available size
-            Update.printError(Serial);
-        }
-#if defined(ESP8266)
-        Update.runAsync(true);
-#endif
-    }
-
-    if (len)
-    {
-        Update.write(data, len);
-    }
-
-    // if the final flag is set then this is the last frame of data
-    if (final)
-    {
-        if (Update.end(true))
-        {
-            // true to set the size to the current progress
-            Serial.printf("Update Success: %ub written\nRebooting...\n", index + len);
-            ESP.restart();
-        }
-        else
-        {
-            Update.printError(Serial);
-        }
-    }
-}
-
-void setupGUI()
-{
-    ESPUI.begin("RS485-WiFi v0.5"); // It is important that ESPUI.begin(...) is called first so that ESPUI.server is initalized
-
-    ESPUI.server->on("/ota", 
-        HTTP_POST, 
-        [](AsyncWebServerRequest* request) { request->send(200); }, 
-        handleOTAUpload);
-
-    ESPUI.server->on("/ota", 
-        HTTP_GET, 
-        [](AsyncWebServerRequest* request) {
-            AsyncWebServerResponse* response = request->beginResponse_P(200, "text/html", OTA_INDEX);
-            request->send(response);
-        }
-    );
-}
-
-void SaveButtontxt(Control *sender, int type) {
-  switch (type) {
-  case B_DOWN:
-    Serial.println("Saving");
-    WriteConfigToEEPROM();
-    ESPUI.updateControlValue(savestatustxt , "Changes Saved");
-    break;
-  }
-}
-
-void RebootButtontxt(Control *sender, int type) {
-  switch (type) {
-  case B_DOWN:
-    Serial.println("Rebooting");
-    ESP.restart();
-    break;
-  }
-}
-
-void OverVoltDisttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void OverVoltRecontxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void EQChargeVolttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void BoostChargeVolttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void FloatChargeVolttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void BoostReconChargeVolttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void BatteryChargePercenttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void ChargeLimitVolttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void DischargeLimitVolttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void LowVoltDisconnecttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void LowVoltReconnecttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void UnderVoltWarningVolttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void UnderVoltReconnectVolttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void BatteryDischargePercenttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void BoostDurationtxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void EQDurationtxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void BatteryCapactitytxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void DEVICEIDtxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-  myConfig.Device_ID = atoi ( (sender->value).c_str() );
-  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
-}
-
-void DEVICEBAUDtxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-  myConfig.Device_BAUD = atoi ( (sender->value).c_str() );
-  Serial.begin(myConfig.Device_BAUD);
-  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
-}
-
-void MQTTIPtxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-  strcpy(myConfig.mqtt_server,(sender->value).c_str());
-  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
-}
-
-void MQTTPorttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-  myConfig.mqtt_port = atoi ( (sender->value).c_str() );
-  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");  
-}
-
-void MQTTUsertxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-  strcpy(myConfig.mqtt_username,(sender->value).c_str());
-  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
-}
-
-void MQTTPasstxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-  strcpy(myConfig.mqtt_password,(sender->value).c_str());
-  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
-}
-
-void MQTTTopictxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-  strcpy(myConfig.mqtt_topic,(sender->value).c_str());
-  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
-}
-
-void InfluxDBIPtxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-  strcpy(myConfig.influxdb_host,(sender->value).c_str());
-  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
-}
-
-void InfluxDBPorttxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-  myConfig.influxdb_httpPort = atoi ( (sender->value).c_str() );
-  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
-}
-
-void InfluxDBtxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-  strcpy(myConfig.influxdb_database,(sender->value).c_str());
-  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
-}
-
-void InfluxDBUsertxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-  strcpy(myConfig.influxdb_user,(sender->value).c_str());
-  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
-}
-
-void InfluxDBPasstxt(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-  strcpy(myConfig.influxdb_password,(sender->value).c_str());
-  ESPUI.updateControlValue(savestatustxt , "Changes Unsaved");
-}
-
-void BatteryTypeList(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void ChargingModeList(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-void RatedVoltagelvlList(Control *sender, int type) {
-  Serial.print("Text: ID: ");
-  Serial.print(sender->id);
-  Serial.print(", Value: ");
-  Serial.println(sender->value);
-}
-
-
-// Pins
-//
-#define MAX485_DE         D2  // data or
-#define MAX485_RE         D1  // recv enable
-
-
-ModbusMaster node;   // instantiate ModbusMaster object
-
-void LoadSwitch(Control *sender, int value) {
-  switch (value) {
-  case S_ACTIVE:
-    Serial.print("Active:");
-    loadState = true;
-    do_update = 1;
-    switch_load = 1;
-    break;
-
-  case S_INACTIVE:
-    Serial.print("Inactive");
-    loadState = false;
-    do_update = 1;
-    switch_load = 1;
-    break;
-  }
-  Serial.print(" ");
-  Serial.println(sender->id);
-}
-
-void InfluxDBEnSwitch(Control *sender, int value) {
-  switch (value) {
-  case S_ACTIVE:
-    Serial.print("Active:");
-    myConfig.influxdb_enabled = 1;
-    break;
-
-  case S_INACTIVE:
-    Serial.print("Inactive");
-    myConfig.influxdb_enabled = 0;
-    break;
-  }
-
-  Serial.print(" ");
-  Serial.println(sender->id);
-}
-
-void MQTTEnSwitch(Control *sender, int value) {
-  switch (value) {
-  case S_ACTIVE:
-    Serial.print("Active:");
-    myConfig.MQTT_Enable = 1;
-    break;
-
-  case S_INACTIVE:
-    Serial.print("Inactive");
-    myConfig.MQTT_Enable = 0;
-    break;
-  }
-
-  Serial.print(" ");
-  Serial.println(sender->id);
-}
-
 void setup(void) {
+  //Attempt to read settings and if it fails resort to factory defaults
   if (!LoadConfigFromEEPROM())
     FactoryResetSettings();
     
@@ -581,7 +112,6 @@ void setup(void) {
     
   LoadSwitchstate = ESPUI.addControl(ControlType::Switcher, "Load", "", ControlColor::Alizarin,tab3, &LoadSwitch);
 
-  
   RebootButton = ESPUI.addControl( ControlType::Button, "Reboot", "Reboot", ControlColor::Peterriver, tab3, &RebootButtontxt );
   SaveButton = ESPUI.addControl( ControlType::Button, "Save Settings", "Save", ControlColor::Peterriver, tab3, &SaveButtontxt );
   savestatustxt = ESPUI.addControl( ControlType::Label, "Status:", "Changes Saved", ControlColor::Turquoise, tab3 );
@@ -598,7 +128,6 @@ void setup(void) {
   digitalWrite(MAX485_RE, 0);
   digitalWrite(MAX485_DE, 0);
 
-
   // EPEver Device ID and Baud Rate
   node.begin(myConfig.Device_ID, Serial);
     
@@ -606,13 +135,11 @@ void setup(void) {
   node.preTransmission(preTransmission);
   node.postTransmission(postTransmission);
 
-
   AsyncWiFiManager wifiManager(&server,&dns);
   wifiManager.autoConnect("RS485-WiFi");
   wifiManager.setConfigPortalTimeout(180);
   ESPUI.jsonInitialDocumentSize = 16000; // This is the default, adjust when you have too many widgets or options
-  //Start Web Interface with OTA enabled
-  setupGUI();
+  setupGUI();  //Start Web Interface with OTA enabled
 }
 
 uint16_t ReadTegister(uint16_t Register) {
@@ -625,12 +152,12 @@ uint16_t ReadTegister(uint16_t Register) {
     
     EQChargeVoltValue = node.getResponseBuffer(0);
     Serial.println(String(node.getResponseBuffer(0)));
-  } else  {
+  } else  if (debug) {
     Serial.print("Miss read - "); 
     Serial.print(Register);
     Serial.print(", ret val:");
     Serial.println(result, HEX);
-  }
+    }
   return result;
 }
 
@@ -652,11 +179,12 @@ void ReadValues() {
     rtc.buf[1]  = node.getResponseBuffer(1);
     rtc.buf[2]  = node.getResponseBuffer(2);
     
-  } else {
+  } else if (debug) {
     Serial.print("Miss read rtc-data, ret val:");
     Serial.println(result, HEX);
   } 
-
+  if (result==226)     ErrorCounter++;
+  
   // read LIVE-Data
   // 
   delay(200);
@@ -667,7 +195,7 @@ void ReadValues() {
 
     for(i=0; i< LIVE_DATA_CNT ;i++) live.buf[i] = node.getResponseBuffer(i);
        
-  } else {
+  } else if (debug) {
     Serial.print("Miss read liva-data, ret val:");
     Serial.println(result, HEX);
   } 
@@ -684,7 +212,7 @@ void ReadValues() {
     
     for(i=0; i< STATISTICS_CNT ;i++)  stats.buf[i] = node.getResponseBuffer(i);
     
-  } else  {
+  } else  if (debug) {
     Serial.print("Miss read statistics, ret val:");
     Serial.println(result, HEX);
   } 
@@ -698,7 +226,7 @@ void ReadValues() {
     
     BatteryType = node.getResponseBuffer(0);
     Serial.println(String(node.getResponseBuffer(0)));
-  } else  {
+  } else  if (debug) {
     Serial.print("Miss read BATTERY_TYPE, ret val:");
     Serial.println(result, HEX);
   }
@@ -712,7 +240,7 @@ void ReadValues() {
     
     EQChargeVoltValue = node.getResponseBuffer(0);
     Serial.println(String(node.getResponseBuffer(0)));
-  } else  {
+  } else  if (debug) {
     Serial.print("Miss read EQ_CHARGE_VOLT, ret val:");
     Serial.println(result, HEX);
   }
@@ -726,7 +254,7 @@ void ReadValues() {
     
     ChargeLimitVolt = node.getResponseBuffer(0);
     Serial.println(String(node.getResponseBuffer(0)));
-  } else  {
+  } else  if (debug) {
     Serial.print("Miss read CHARGING_LIMIT_VOLT, ret val:");
     Serial.println(result, HEX);
   }
@@ -742,7 +270,7 @@ void ReadValues() {
     
     BatteryCapactity = node.getResponseBuffer(0);
     Serial.println(String(node.getResponseBuffer(0)));
-  } else  {
+  } else  if (debug) {
     Serial.print("Miss read BATTERY_CAPACITY, ret val:");
     Serial.println(result, HEX);
   }
@@ -757,7 +285,7 @@ void ReadValues() {
     
     batterySOC = node.getResponseBuffer(0);
     
-  } else  {
+  } else  if (debug) {
     Serial.print("Miss read batterySOC, ret val:");
     Serial.println(result, HEX);
   }
@@ -772,7 +300,7 @@ void ReadValues() {
     batteryCurrent = node.getResponseBuffer(0);
     batteryCurrent |= node.getResponseBuffer(1) << 16;
     
-  } else  {
+  } else  if (debug) {
     Serial.print("Miss read batteryCurrent, ret val:");
     Serial.println(result, HEX);
   }
@@ -787,7 +315,7 @@ void ReadValues() {
     
     loadState = node.getResponseBuffer(0);
         
-  } else  {
+  } else  if (debug) {
     Serial.print("Miss read loadState, ret val:");
     Serial.println(result, HEX);
   }
@@ -801,7 +329,7 @@ void ReadValues() {
     
     CCModel = node.getResponseBuffer(0);
     
-  } else  {
+  } else  if (debug) {
     Serial.print("Miss read Model, ret val:");
     Serial.println(result, HEX);
   }
@@ -826,7 +354,7 @@ void ReadValues() {
     charger_mode        = ( temp & 0b0000000000001100 ) >> 2 ;
     if (debug) Serial.print( "charger_mode  : "); Serial.println( charger_mode );
     
-  } else  {
+  } else  if (debug) {
     Serial.print("Miss read ChargeState, ret val:");
     Serial.println(result, HEX);
   }
@@ -883,7 +411,6 @@ void loop(void) {
   // Print out to serial if debug is enabled.
   //
   if (debug) debug_output();
-
   
   ESPUI.updateControlValue(MQTTIP , String(myConfig.mqtt_server));
   ESPUI.updateControlValue(MQTTPORT , String(myConfig.mqtt_port));
@@ -921,7 +448,7 @@ void loop(void) {
   ESPUI.updateControlValue(ChargingStatus , String(charger_charging_status[ charger_mode]));
   ESPUI.updateControlValue(BatteryStatus , String(batt_volt_status[status_batt.volt]));
   ESPUI.updateControlValue(BatteryTemp , String(batt_temp_status[status_batt.temp]));
-
+  
   //Update historical values
   ESPUI.updateControlValue(Maxinputvolttoday, String(stats.s.pVmax/100.f)+"V");
   ESPUI.updateControlValue(Mininputvolttoday , String(stats.s.pVmin/100.f)+"V");
@@ -959,8 +486,9 @@ void loop(void) {
   if(myConfig.influxdb_enabled == 1) {
     Influxdb_postData(); 
   }
-
-// Do the Switching of the Load here
+  }
+  
+  // Do the Switching of the Load here and post new state to MQTT if enabled
   if( switch_load == 1 ){
     switch_load = 0;  
     Serial.print("Switching Load ");
@@ -971,9 +499,40 @@ void loop(void) {
     if (result != node.ku8MBSuccess)  {
       Serial.print("Miss write loadState, ret val:");
       Serial.println(result, HEX);
-    } 
-    
+    }
+
+    if (myConfig.MQTT_Enable == 1) {
+    // establish/keep mqtt connection
+    //
+    if (!mqtt_client.connected())
+    { 
+      mqtt_client.setServer(myConfig.mqtt_server, myConfig.mqtt_port);
+      mqtt_client.setCallback(mqtt_callback);
+      mqtt_reconnect(); 
+    }
+  
+    mqtt_loadpublish();
+    mqtt_client.loop();
+    }
   }
+  
+
+  //Check error count and if it exceeds 5 reset modbus
+  Serial.println("Error count = " + String(ErrorCounter));
+  if (ErrorCounter>5) {
+    // init modbus in receive mode
+    pinMode(MAX485_RE, OUTPUT);
+    pinMode(MAX485_DE, OUTPUT);
+    digitalWrite(MAX485_RE, 0);
+    digitalWrite(MAX485_DE, 0);
+
+    // EPEver Device ID and Baud Rate
+    node.begin(myConfig.Device_ID, Serial);
+    
+    // modbus callbacks
+    node.preTransmission(preTransmission);
+    node.postTransmission(postTransmission);
+    ErrorCounter = 0;  
   }
   
   // power down MAX485_DE

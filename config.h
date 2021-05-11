@@ -1,5 +1,10 @@
 uint8_t i, result;
 
+// Pins
+//
+#define MAX485_DE         D2  // data or
+#define MAX485_RE         D1  // recv enable
+
 // ModBus Register Locations
 //
 #define LIVE_DATA       0x3100     // start of live-data 
@@ -72,6 +77,86 @@ uint8_t i, result;
 #define HIGH_VOLTAGE_DISCONNECT 0x9003  //
 #define CHARGING_LIMIT_VOLT     0x9004  //
 #define EQ_CHARGE_VOLT          0x9006
+
+uint16_t ErrorCounter=0;
+uint16_t savestatustxt;
+uint16_t Abouttxt;
+uint16_t SaveButton;
+uint16_t RebootButton;
+uint16_t Model;
+String CCModel;
+uint16_t StatusLabel;
+uint16_t BatteryStateOC;
+uint16_t ChargingStatus;
+uint16_t SolarVoltage;
+uint16_t SolarAmps;
+uint16_t SolarWattage;
+uint16_t BatteryVoltage;
+uint16_t BatteryAmps;
+uint16_t BatteryWattage;
+uint16_t BatteryStatus;
+uint16_t LoadVoltage;
+uint16_t LoadAmps;
+uint16_t LoadWattage;
+uint16_t LoadStatus;
+uint16_t LoadSwitchstate;
+uint16_t Status;
+uint16_t TPPassthrough;
+uint16_t DeviceTemp;
+uint16_t MQTTEN;
+uint16_t MQTTIP;
+uint16_t MQTTPORT;
+uint16_t MQTTUSER;
+uint16_t MQTTPASS;
+uint16_t MQTTTOPIC;
+
+uint16_t DEVICEID;
+uint16_t DEVICEBAUD;
+
+uint16_t INFLUXDBIP;
+uint16_t INFLUXDBPORT;
+uint16_t INFLUXDBDB;
+uint16_t INFLUXDBUSER;
+uint16_t INFLUXDBPASS;
+uint16_t INFLUXDBEN;
+
+uint16_t OverVoltDist;
+uint16_t OverVoltRecon;
+uint16_t EQChargeVolt;
+uint16_t BoostChargeVolt;
+uint16_t FloatChargeVolt;
+uint16_t BoostReconChargeVolt;
+uint16_t BatteryChargePercent;
+uint16_t ChargeLimitVolt;
+uint16_t DischargeLimitVolt;
+uint16_t LowVoltDisconnect;
+uint16_t LowVoltReconnect;
+uint16_t UnderVoltWarningVolt;
+uint16_t UnderVoltReconnectVolt;
+uint16_t BatteryDischargePercent;
+uint16_t BoostDuration;
+uint16_t EQDuration;
+uint16_t BatteryCapactity;
+uint16_t BatteryType;
+
+uint16_t Maxinputvolttoday;
+uint16_t Mininputvolttoday;
+uint16_t MaxBatteryvolttoday;
+uint16_t MinBatteryvolttoday;
+uint16_t ConsumedEnergyToday;
+uint16_t ConsumedEnergyMonth;
+uint16_t ConsumedEngeryYear;
+uint16_t TotalConsumedEnergy;
+uint16_t GeneratedEnergyToday;
+uint16_t GeneratedEnergyMonth;
+uint16_t GeneratedEnergyYear;
+uint16_t TotalGeneratedEnergy;
+uint16_t Co2Reduction;
+uint16_t NetBatteryCurrent;
+uint16_t BatteryTemp;
+uint16_t AmbientTemp;
+
+uint16_t EQChargeVoltValue;
 
   // datastructures, also for buffer to values conversion
   //
