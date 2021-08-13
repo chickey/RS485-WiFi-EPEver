@@ -17,6 +17,7 @@
  *    Version 0.51
  *    
 */
+
 #ifndef MQTT_MAX_PACKET_SIZE
   #define MQTT_MAX_PACKET_SIZE 512
 #endif

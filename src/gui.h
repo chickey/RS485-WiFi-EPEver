@@ -43,7 +43,7 @@ void handleOTAUpload(AsyncWebServerRequest* request, String filename, size_t ind
 void setupGUI()
 {
     ESPUI.jsonUpdateDocumentSize = 2000; // This is the default, and this value is not affected by the amount of widgets
-    ESPUI.jsonInitialDocumentSize = 12000; // Default is 8000. Increased as there are a lot of widgets causing display to not work on newer versions of ESPUI library
+    ESPUI.jsonInitialDocumentSize = 14000; // Default is 8000. Increased as there are a lot of widgets causing display to not work on newer versions of ESPUI library
  
     ESPUI.begin(DEVICE_FULL_NAME); // It is important that ESPUI.begin(...) is called first so that ESPUI.server is initalized
 
