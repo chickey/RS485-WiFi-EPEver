@@ -36,13 +36,16 @@ void Influxdb_postData() {
   http.addHeader("Content-Type", "data-binary");
   int httpCode = http.POST(poststring);
   String payload = http.getString();
+#ifdef DEBUG
   Serial.println (payload);
+#endif
   
   WiFiClient client;
   
   if (!client.connect(myConfig.influxdb_host, myConfig.influxdb_httpPort)) {
+#ifdef DEBUG
     Serial.println("connection failed");
-
+#endif
   } else {
     // This will send the request to the server
     client.print(String("GET ") + url + " HTTP/1.1\r\nHost: " + myConfig.influxdb_host + "\r\nConnection: close\r\n\r\n");
@@ -54,7 +57,9 @@ void Influxdb_postData() {
       yield();
 
       if (millis() > timeout) {
+#ifdef DEBUG
         Serial.println(">>> Client Timeout !");
+#endif
         client.stop();
         return;
       }
