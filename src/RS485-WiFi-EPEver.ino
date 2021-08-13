@@ -31,7 +31,7 @@
 #include <ESP8266HTTPClient.h>
 
 #include <ESPAsyncWebServer.h>    //Local WebServer used to serve the configuration portal
-#include <ESPAsync_WiFiManager.h>  // switched from tapzu to https://github.com/khoih-prog/ESPAsync_WiFiManager
+#include <ESPAsyncWiFiManager.h>  // switched from tapzu to https://github.com/khoih-prog/ESPAsync_WiFiManager
 
 #include <Updater.h>
 
@@ -143,7 +143,7 @@ void setup(void) {
   node.preTransmission(preTransmission);
   node.postTransmission(postTransmission);
 
-  ESPAsync_WiFiManager wifiManager(&server,&dns);
+  AsyncWiFiManager wifiManager(&server,&dns);
   wifiManager.autoConnect("RS485-WiFi");
   wifiManager.setConfigPortalTimeout(180);
   ESPUI.jsonInitialDocumentSize = 16000; // This is the default, adjust when you have too many widgets or options

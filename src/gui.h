@@ -45,8 +45,7 @@ void setupGUI()
     ESPUI.jsonUpdateDocumentSize = 2000; // This is the default, and this value is not affected by the amount of widgets
     ESPUI.jsonInitialDocumentSize = 12000; // Default is 8000. Increased as there are a lot of widgets causing display to not work on newer versions of ESPUI library
  
-    String deviceName = String(DEVICE_NAME) + " v" + String(SW_VERSION);
-    ESPUI.begin("RS485-WiFi v0.51"); // It is important that ESPUI.begin(...) is called first so that ESPUI.server is initalized
+    ESPUI.begin(DEVICE_FULL_NAME); // It is important that ESPUI.begin(...) is called first so that ESPUI.server is initalized
 
     ESPUI.server->on("/ota", 
         HTTP_POST, 

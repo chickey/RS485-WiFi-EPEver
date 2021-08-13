@@ -3,8 +3,17 @@
 #ifndef config_settings_H_
 #define config_settings_H_
 
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+
+#ifndef DEVICE_NAME
 #define DEVICE_NAME "RS485-WiFi"
+#endif
+#ifndef SW_VERSION
 #define SW_VERSION 0.51
+#endif
+
+#define DEVICE_FULL_NAME DEVICE_NAME " v" STR(SW_VERSION)
 
 //Where in EEPROM do we store the configuration
 #define EEPROM_storageSize 2048
