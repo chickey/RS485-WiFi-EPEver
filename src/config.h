@@ -1,12 +1,9 @@
-uint8_t i, result;
 
 // Pins
-//
 #define MAX485_DE         D2  // data or
 #define MAX485_RE         D1  // recv enable
 
 // ModBus Register Locations
-//
 #define LIVE_DATA       0x3100     // start of live-data 
 #define LIVE_DATA_CNT   16         // 16 regs
 
@@ -26,7 +23,7 @@ uint8_t i, result;
 #define LOAD_POWER_L    0x0E
 #define LOAD_POWER_H    0x0F
 
-#define CCMODEL           0x2b
+#define CCMODEL         0x2b
 
 #define RTC_CLOCK           0x9013  // D7-0 Sec, D15-8 Min  :   D7-0 Hour, D15-8 Day  :  D7-0 Month, D15-8 Year
 #define RTC_CLOCK_CNT       3       // 3 regs
@@ -69,7 +66,7 @@ uint8_t i, result;
 
 #define LOAD_STATE         0x02 // r/w load switch state
 
-#define STATUS_FLAGS    0x3200
+#define STATUS_FLAGS      0x3200
 #define STATUS_BATTERY    0x00  // Battery status register
 #define STATUS_CHARGER    0x01  // Charging equipment status register
 #define BATTERY_TYPE      0x9000  // Battery Type 0001H- Sealed , 0002H- GEL, 0003H- Flooded, 0000H- User defined
@@ -83,8 +80,9 @@ uint16_t savestatustxt;
 uint16_t Abouttxt;
 uint16_t SaveButton;
 uint16_t RebootButton;
+uint16_t FactoryResetButton;
 uint16_t Model;
-String CCModel;
+String   CCModel;
 uint16_t StatusLabel;
 uint16_t BatteryStateOC;
 uint16_t ChargingStatus;
@@ -109,6 +107,7 @@ uint16_t MQTTPORT;
 uint16_t MQTTUSER;
 uint16_t MQTTPASS;
 uint16_t MQTTTOPIC;
+uint16_t MQTT_HA_EN;
 
 uint16_t DEVICEID;
 uint16_t DEVICEBAUD;
@@ -228,7 +227,7 @@ uint16_t EQChargeVoltValue;
 
   // these are too far away for the union conversion trick
   uint16_t batterySOC = 0;
-  int32_t batteryCurrent = 0;
+  int32_t  batteryCurrent = 0;
     
   // battery status
   struct {
@@ -236,30 +235,26 @@ uint16_t EQChargeVoltValue;
     uint8_t temp;        // d7-d4  Temperature: 00H Normal, 01H Over warning settings, 02H Lower than the warning settings
     uint8_t resistance;  // d8     abnormal 1, normal 0
     uint8_t rated_volt;  // d15    1-Wrong identification for rated voltage
-  } status_batt ;
+  } status_batt;
 
-  char batt_volt_status[][20] = {
+  const char* batt_volt_status[] = {
     "Normal",
     "Overvolt",
     "Low Volt Disconnect",
     "Fault"
   };
   
-  char batt_temp_status[][16] = {
+  const char* batt_temp_status[] = {
     "Normal",
     "Over WarnTemp",
     "Below WarnTemp"
   };
 
   uint8_t charger_mode  = 0;
-    
-  char charger_charging_status[][12] = {
+  
+  const char* charger_charging_status[] = {
     "Off",
     "Float",
     "Boost",
     "Equlization"
   };
-
-  //
-
-  

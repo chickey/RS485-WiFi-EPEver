@@ -2,6 +2,7 @@
 
 #include "settings.h"
 eeprom_settings myConfig;
+char baseMacChr[13] = {0};
 
 uint32_t calculateCRC32(const uint8_t *data, size_t length)
 {
@@ -57,29 +58,31 @@ bool LoadConfigFromEEPROM() {
 
 #ifdef DEBUG
   //Config is not configured or gone bad, return FALSE
-  Serial.println("Config is not configured or gone bad");
+  Serial.println(F("Config is not configured or gone bad"));
 #endif
 
   return false;
 }
 
 void FactoryResetSettings() {
-  strcpy(myConfig.influxdb_host, DEFAULT_INFLUXDB_HOST );
+  strcpy(myConfig.influxdb_host    , DEFAULT_INFLUXDB_HOST );
   strcpy(myConfig.influxdb_database, DEFAULT_INFLUXDB_DATABASE );
-  strcpy(myConfig.influxdb_user, DEFAULT_INFLUXDB_USER );
+  strcpy(myConfig.influxdb_user    , DEFAULT_INFLUXDB_USER );
   strcpy(myConfig.influxdb_password, DEFAULT_INFLUXDB_PASSWORD );
 
-  myConfig.influxdb_enabled=false;
-  myConfig.influxdb_httpPort=DEFAULT_INFLUXDB_PORT;
+  myConfig.influxdb_enabled  = false;
+  myConfig.influxdb_httpPort = DEFAULT_INFLUXDB_PORT;
 
-  strcpy(myConfig.mqtt_server, DEFAULT_MQTT_SERVER );
+  strcpy(myConfig.mqtt_server  , DEFAULT_MQTT_SERVER );
   strcpy(myConfig.mqtt_username, DEFAULT_MQTT_USERNAME);
   strcpy(myConfig.mqtt_password, DEFAULT_MQTT_PASSWORD);
-  strcpy(myConfig.mqtt_topic, DEFAULT_MQTT_TOPIC);
+  strcpy(myConfig.mqtt_topic   , DEFAULT_MQTT_TOPIC);
   
-  myConfig.MQTT_Enable=false;
-  myConfig.mqtt_port = DEFAULT_MQTT_PORT;
+  myConfig.MQTT_Enable =false;
+  myConfig.mqtt_port   = DEFAULT_MQTT_PORT;
 
+  myConfig.HADiscovery_Enable = false;
+  
   myConfig.Device_ID   = DEFAULT_DEVICE_ID;
   myConfig.Device_BAUD = DEFAULT_SERIAL_BAUD;
   
