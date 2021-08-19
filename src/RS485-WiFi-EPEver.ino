@@ -40,6 +40,7 @@ const char* OTA_INDEX PROGMEM
 //#define DEBUG
 //#define GUI_DEBUG
 //#define MQTT_DEBUG
+//#define INFLUX_DEBUG
 ////////////////
 
 #include "settings.h"
@@ -54,7 +55,7 @@ ModbusMaster node;   // instantiate ModbusMaster object
 
 
 #ifndef TRANSMIT_PERIOD
-  #define TRANSMIT_PERIOD 10000
+  #define TRANSMIT_PERIOD 30000
 #endif
 unsigned long time_now = 0;
 
@@ -473,11 +474,9 @@ void loop(void) {
   if (setPublishHADiscovery)
   {
     publishHADiscovery();
-    //set to false as they don't need to be republished
-    setPublishHADiscovery = false;
   }
 
-  String buffer(0);
+  String buffer;
   buffer.reserve(64);
   // Print out to serial if debug is enabled.
   //

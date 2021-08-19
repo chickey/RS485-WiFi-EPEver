@@ -10,7 +10,7 @@
 #define DEVICE_NAME "RS485-WiFi"
 #endif
 #ifndef SW_VERSION
-#define SW_VERSION 0.51
+#define SW_VERSION 0.60
 #endif
 #ifndef DEVICE_DESCRIPTION
   #define DEVICE_DESCRIPTION "EpEver Solar Monitor"

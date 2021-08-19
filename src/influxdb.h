@@ -1,16 +1,24 @@
 void Influxdb_postData() {
-  String poststring(0);
-  poststring.reserve(768); //reserve string in memory to prevent fragmentation
+  String poststring, url;
+  poststring.reserve(768); //reserve String in memory to prevent fragmentation
+  url.reserve(256);
   HTTPClient http;
-  WiFiClient client;
 
   //Construct URL for the influxdb
-  String url(0);
-  url.reserve(256);
-  url = url + F("http://") + String(myConfig.influxdb_host) + F(":") + myConfig.influxdb_httpPort + F("/write?db=") + String(myConfig.influxdb_database) + F("&u=") + String(myConfig.influxdb_user) + F("&p=") + String(myConfig.influxdb_password);
-  
-  http.begin(client, url);
-  http.addHeader(F("Content-Type"), F("data-binary"));
+  url.concat(F("http://"));
+  url.concat(myConfig.influxdb_host);
+  url.concat(F(":"));
+  url.concat(myConfig.influxdb_httpPort);
+  url.concat(F("/write?db="));
+  url.concat(myConfig.influxdb_database);
+  url.concat(F("&u="));
+  url.concat(myConfig.influxdb_user);
+  url.concat(F("&p="));
+  url.concat(myConfig.influxdb_password);
+
+#if defined(DEBUG) || defined(INFLUX_DEBUG)
+  Serial.println(url);
+#endif
   
   //Output to grafana using a http post
   poststring.concat(F("Panel-Voltage value="));
@@ -55,25 +63,33 @@ void Influxdb_postData() {
   poststring.concat(stats.s.genEnerTotal/100.f);
   poststring.concat(F("\nBattery-Voltage-Status value=\""));
   poststring.concat(batt_volt_status[status_batt.volt]);
-  poststring.concat(F("\nBattery-Temp value=\""));
+  poststring.concat(F("\"\nBattery-Temp value=\""));
   poststring.concat(batt_temp_status[status_batt.temp]);
-  poststring.concat(F("\nCharger-Mode value=\""));
+  poststring.concat(F("\"\nCharger-Mode value=\""));
   poststring.concat(charger_charging_status[charger_mode]);
   poststring.concat(F("\"\n"));
 
+#if defined(DEBUG) || defined(INFLUX_DEBUG)
+  Serial.println(poststring);
+#endif
+
+  http.begin(url);
+  http.addHeader("Content-Type", "data-binary");
   http.POST(poststring);
   String payload = http.getString();
-#ifdef DEBUG
-  Serial.println (payload);
+
+#if defined(DEBUG) || defined(INFLUX_DEBUG)
+  Serial.println(payload);
 #endif
   
+  WiFiClient client;
+  
   if (!client.connect(myConfig.influxdb_host, myConfig.influxdb_httpPort)) {
-#ifdef DEBUG
-    Serial.println(F("connection failed"));
-#endif
+    Serial.println("connection failed");
+
   } else {
     // This will send the request to the server
-    client.print(String(F("GET ")) + url + F(" HTTP/1.1\r\nHost: ") + myConfig.influxdb_host + F("\r\nConnection: close\r\n\r\n"));
+    client.print(String("GET ") + url + " HTTP/1.1\r\nHost: " + myConfig.influxdb_host + "\r\nConnection: close\r\n\r\n");
     
     unsigned long timeout = millis() + 2500;
     // Read all the lines of the reply from server and print them to Serial
@@ -82,9 +98,7 @@ void Influxdb_postData() {
       yield();
 
       if (millis() > timeout) {
-#ifdef DEBUG
-        Serial.println(F(">>> Client Timeout !"));
-#endif
+        Serial.println(">>> Client Timeout !");
         client.stop();
         return;
       }

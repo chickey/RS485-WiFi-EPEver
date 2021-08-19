@@ -459,9 +459,7 @@ void MQTTEnSwitch(Control *sender, int value) {
   switch (value) {
   case S_ACTIVE:
     myConfig.MQTT_Enable = true;
-    if (myConfig.HADiscovery_Enable) {
-      setPublishHADiscovery = myConfig.HADiscovery_Enable;
-    }
+    setPublishHADiscovery = myConfig.HADiscovery_Enable;
     break;
 
   case S_INACTIVE:
