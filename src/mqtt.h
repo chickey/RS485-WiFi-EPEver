@@ -280,15 +280,23 @@ void sendHA_Discovery_Packet( const __FlashStringHelper* type, const __FlashStri
 
   // there is a command topic, so add control attributes
   if (cmd_t != 0)
-  {
-    panelDoc[F("stat_on")]  = pl_on;
-    panelDoc[F("stat_off")] = pl_off;
-  
+  {  
+    if (pl_on != 0 && pl_off != 0)
+    {
+      panelDoc[F("stat_on")]  = pl_on;
+      panelDoc[F("stat_off")] = pl_off;
+    }
+    
     sprintf_P(buf, PSTR("%s%S%S"), myConfig.mqtt_topic, stat_r_leaf, cmd_t);
     panelDoc[F("cmd_t")]    = buf;
-    panelDoc[F("pl_on")]    = pl_on;
-    panelDoc[F("pl_off")]   = pl_off;
   }
+
+  if (pl_on != 0)
+    panelDoc[F("pl_on")]    = pl_on;
+    
+  if (pl_off != 0)
+    panelDoc[F("pl_off")]   = pl_off;
+  
 
   JsonObject device = panelDoc.createNestedObject(F("device"));
     device[F("name")]  = DEVICE_DESCRIPTION;
@@ -326,7 +334,7 @@ void publishHADiscovery()
     sendHA_Discovery_Packet(F("sensor/"), F("Load V"), F("/load"), F("V"), F("loadV"), F("V"), F("voltage"));
     sendHA_Discovery_Packet(F("sensor/"), F("Load I"), F("/load"), F("I"), F("loadI"), F("A"), F("current"));
     sendHA_Discovery_Packet(F("sensor/"), F("Load P"), F("/load"), F("P"), F("loadP"), F("W"), F("energy"));
-    sendHA_Discovery_Packet(F("binary_sensor/"), F("Load State"), F("/load"), F("state"), F("loadState"));
+    sendHA_Discovery_Packet(F("binary_sensor/"), F("Load State"), F("/load"), F("state"), F("loadState"), 0, 0, 0, F("on"), F("off"));
 
     //Publish Load Switch
     sendHA_Discovery_Packet(F("switch/"), F("Load Switch"), F("/load"), F("state"), F("loadSwitch"), 0 ,0 ,F("/control"), F("on"), F("off"));
