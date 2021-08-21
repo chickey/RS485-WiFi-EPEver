@@ -128,8 +128,10 @@ void setup(void) {
   savestatustxt = ESPUI.addControl( ControlType::Label, "Status:", "Changes Saved", ControlColor::Turquoise, tab3 );
 
   Abouttxt = ESPUI.addControl( ControlType::Label, "", "RS485 TO  WIFI ADAPTOR CODE<br><br>https://github.com/chickey/RS485-WiFi-EPEver<br><br>by Colin Hickey 2021<br><br>I'm always up for suggestions either via github or if you wish to chat with like minded people and pick people's brains on their setups i have setup a discord server<br><br>https://discord.gg/kBDmrzE", ControlColor::Turquoise,tab4 );
+#ifdef ENABLE_HA_FACTORY_RESET_FUNCTIONS
   FactoryResetButton = ESPUI.addControl( ControlType::Button, "Reset to Factory Settings", "Reset", ControlColor::Alizarin, tab4, &FactoryResetButtontxt );
-  
+#endif
+
   Serial.begin(myConfig.Device_BAUD);
 
   // Connect D0 to RST to wake up

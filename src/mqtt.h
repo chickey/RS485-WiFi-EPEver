@@ -77,7 +77,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
         if ( strncmp_P( (char *) payload , PSTR("reboot"),1) == 0 ) {
             ESP.restart();
         }
-#ifdef HA_FACTORY_RESET
+#ifdef ENABLE_HA_FACTORY_RESET_FUNCTIONS
         if ( strncmp_P( (char *) payload , PSTR("factoryreset"),1) == 0 ) {
             ESP.restart();
         }
@@ -286,7 +286,7 @@ void sendHA_Discovery_Packet( const __FlashStringHelper* type, const __FlashStri
       panelDoc[F("stat_on")]  = pl_on;
       panelDoc[F("stat_off")] = pl_off;
     }
-    
+
     sprintf_P(buf, PSTR("%s%S%S"), myConfig.mqtt_topic, stat_r_leaf, cmd_t);
     panelDoc[F("cmd_t")]    = buf;
   }
@@ -356,7 +356,7 @@ void publishHADiscovery()
     //Publish Restart Switch
     sendHA_Discovery_Packet(F("switch/"), F("Restart"), F("/load"), F("state"), F("restart"), 0 ,0 ,F("/control"), F("restart"), F(""));
 
-#ifdef HA_FACTORY_RESET
+#ifdef ENABLE_HA_FACTORY_RESET_FUNCTIONS
     //Publish Factory Reset Switch
     sendHA_Discovery_Packet(F("switch/"), F("Factory Reset"), F("/load"), F("state"), F("factoryreset"), 0 ,0 ,F("/control"), F("FactoryReset"), F(""));
 #endif

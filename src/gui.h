@@ -93,6 +93,7 @@ void RebootButtontxt(Control *sender, int type) {
   }
 }
 
+#ifdef ENABLE_HA_FACTORY_RESET_FUNCTIONS
 void FactoryResetButtontxt(Control *sender, int type) {
   switch (type) {
   case B_DOWN:
@@ -104,6 +105,7 @@ void FactoryResetButtontxt(Control *sender, int type) {
     break;
   }
 }
+#endif
 
 void OverVoltDisttxt(Control *sender, int type) {
 #if defined(DEBUG) || defined(GUI_DEBUG)
