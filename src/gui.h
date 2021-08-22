@@ -70,10 +70,13 @@ void setupGUI()
 }
 
 void SaveButtontxt(Control *sender, int type) {
+  //check if already writing EEPRON (double button click)
+  if (isWrittingEEPROM) return;
+
   switch (type) {
   case B_DOWN:
 #if defined(DEBUG) || defined(GUI_DEBUG)
-    Serial.println(F("\nSaving"));
+    Serial.println(F("\nSave Button Pressed"));
 #endif
 
     WriteConfigToEEPROM();

@@ -3,6 +3,7 @@
 #include "settings.h"
 eeprom_settings myConfig;
 char baseMacChr[13] = {0};
+bool isWrittingEEPROM = false;
 
 uint32_t calculateCRC32(const uint8_t *data, size_t length)
 {
@@ -25,12 +26,35 @@ uint32_t calculateCRC32(const uint8_t *data, size_t length)
 }
 
 void WriteConfigToEEPROM() {
+  isWrittingEEPROM = true;
+
   uint32_t checksum = calculateCRC32((uint8_t*)&myConfig, sizeof(eeprom_settings));
-   
+  uint32_t existingChecksum;
+  
   EEPROM.begin(EEPROM_storageSize);
+  EEPROM.get(EEPROM_CHECKSUM_ADDRESS, existingChecksum);
+  
+  if (checksum == existingChecksum)
+  {
+    //No changes have been made - return
+    EEPROM.end();
+#ifdef DEBUG
+    Serial.println(F("No Changes Made - Not Saving EEPROM"));
+#endif
+
+    isWrittingEEPROM = false;
+    return;
+  }
+
   EEPROM.put(EEPROM_CONFIG_ADDRESS, myConfig);
   EEPROM.put(EEPROM_CHECKSUM_ADDRESS, checksum);
   EEPROM.end();
+
+#ifdef DEBUG
+    Serial.println(F("Saving EEPROM"));
+#endif
+
+  isWrittingEEPROM = false;
 }
 
 bool LoadConfigFromEEPROM() {

@@ -94,6 +94,7 @@ struct eeprom_settings {
 
 extern char baseMacChr[13];
 extern eeprom_settings myConfig;
+extern bool isWrittingEEPROM;
 
 void WriteConfigToEEPROM();
 bool LoadConfigFromEEPROM();
