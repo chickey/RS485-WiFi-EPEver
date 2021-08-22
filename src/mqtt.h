@@ -146,11 +146,19 @@ void mqtt_publish_old() {
 
   sprintf(buf,"%s/energy/consumed_day",myConfig.mqtt_topic);  
   mqtt_publish_f( buf,  stats.s.consEnerDay/100.f );
+  sprintf(buf,"%s/energy/consumed_day",myConfig.mqtt_topic);
+  mqtt_publish_f( buf,  stats.s.consEnerMon/100.f );
+  sprintf(buf,"%s/energy/consumed_year",myConfig.mqtt_topic);  
+  mqtt_publish_f( buf,  stats.s.consEnerYear/100.f );
   sprintf(buf,"%s/energy/consumed_all",myConfig.mqtt_topic);
   mqtt_publish_f( buf,  stats.s.consEnerTotal/100.f );
 
   sprintf(buf,"%s/energy/generated_day",myConfig.mqtt_topic);
   mqtt_publish_f( buf,  stats.s.genEnerDay/100.f );
+  sprintf(buf,"%s/energy/generated_month",myConfig.mqtt_topic);
+  mqtt_publish_f( buf,  stats.s.genEnerMon/100.f );
+  sprintf(buf,"%s/energy/generated_year",myConfig.mqtt_topic);
+  mqtt_publish_f( buf,  stats.s.genEnerYear/100.f );
   sprintf(buf,"%s/energy/generated_all",myConfig.mqtt_topic);
   mqtt_publish_f( buf,   stats.s.genEnerTotal/100.f );
 
@@ -229,8 +237,13 @@ void mqtt_publish() {
 
   //energy
   panelDoc[F("consumed_day")] = stats.s.consEnerDay/100.f;
+  panelDoc[F("consumed_month")] = stats.s.consEnerMon/100.f;
+  panelDoc[F("consumed_year")] = stats.s.consEnerYear/100.f;
   panelDoc[F("consumed_all")] = stats.s.consEnerTotal/100.f;
+
   panelDoc[F("generated_day")] = stats.s.genEnerDay/100.f;
+  panelDoc[F("generated_month")] = stats.s.genEnerMon/100.f;
+  panelDoc[F("generated_year")] = stats.s.genEnerYear/100.f;
   panelDoc[F("generated_all")] = stats.s.genEnerTotal/100.f;
 
   sprintf_P(mqtt_topic, PSTR("%s/energy"), myConfig.mqtt_topic);
@@ -271,7 +284,16 @@ void sendHA_Discovery_Packet( const __FlashStringHelper* type, const __FlashStri
     panelDoc[F("unit_of_meas")] = unit_of_meas;
 
   if (dev_cla != 0)
-    panelDoc[F("dev_cla")]      = dev_cla;
+  {
+    panelDoc[F("dev_cla")] = dev_cla;
+  #ifdef ENERGY_PANEL
+    if (strcmp_P("energy", (PGM_P)dev_cla) == 0)
+    {
+      panelDoc[F("state_class")] = F("measurement");
+      panelDoc[F("last_reset_topic")] = F("epever/status/last_reset");
+    }
+  #endif
+  }
 
   sprintf_P(buf, PSTR("%s%S"), myConfig.mqtt_topic, will_Topic);
   panelDoc[F("avty_t")]       = buf;
@@ -300,9 +322,9 @@ void sendHA_Discovery_Packet( const __FlashStringHelper* type, const __FlashStri
 
   JsonObject device = panelDoc.createNestedObject(F("device"));
     device[F("name")]  = DEVICE_DESCRIPTION;
-    device[F("model")] = DEVICE_NAME;
-    device[F("manufacturer")] = DEVICE_MANUFACTURER;
-    device[F("sw_version")]   = SW_VERSION;
+    device[F("mdl")] = DEVICE_NAME;
+    device[F("mf")] = DEVICE_MANUFACTURER;
+    device[F("sw")]   = SW_VERSION;
   JsonArray identifiers = device.createNestedArray(F("identifiers"));
   identifiers.add(baseMacChr);
 
@@ -340,10 +362,14 @@ void publishHADiscovery()
     sendHA_Discovery_Packet(F("switch/"), F("Load Switch"), F("/load"), F("state"), F("loadSwitch"), 0 ,0 ,F("/control"), F("on"), F("off"));
 
     //Publish Energy Sensors
-    sendHA_Discovery_Packet(F("sensor/"), F("Consumed Today"), F("/energy"), F("consumed_day"), F("consDay"), F("W"), F("energy"));
-    sendHA_Discovery_Packet(F("sensor/"), F("Consumed All"), F("/energy"), F("consumed_all"), F("consAll"), F("W"), F("energy"));
-    sendHA_Discovery_Packet(F("sensor/"), F("Generated Today"), F("/energy"), F("generated_day"), F("genDay"), F("W"), F("energy"));
-    sendHA_Discovery_Packet(F("sensor/"), F("Generated All"), F("/energy"), F("generated_all"), F("genAll"), F("W"), F("energy"));
+    sendHA_Discovery_Packet(F("sensor/"), F("Consumed Today"), F("/energy"), F("consumed_day"), F("consDay"), F("kWh"), F("energy"));
+    sendHA_Discovery_Packet(F("sensor/"), F("Consumed Month"), F("/energy"), F("consumed_month"), F("consMth"), F("kWh"), F("energy"));
+    sendHA_Discovery_Packet(F("sensor/"), F("Consumed Year"), F("/energy"), F("consumed_year"), F("consYr"), F("kWh"), F("energy"));
+    sendHA_Discovery_Packet(F("sensor/"), F("Consumed All"), F("/energy"), F("consumed_all"), F("consAll"), F("kWh"), F("energy"));
+    sendHA_Discovery_Packet(F("sensor/"), F("Generated Today"), F("/energy"), F("generated_day"), F("genDay"), F("kWh"), F("energy"));
+    sendHA_Discovery_Packet(F("sensor/"), F("Generated Month"), F("/energy"), F("generated_month"), F("genMth"), F("kWh"), F("energy"));
+    sendHA_Discovery_Packet(F("sensor/"), F("Generated Year"), F("/energy"), F("generated_year"), F("genYr"), F("kWh"), F("energy"));
+    sendHA_Discovery_Packet(F("sensor/"), F("Generated All"), F("/energy"), F("generated_all"), F("genAll"), F("kWh"), F("energy"));
 
     //Publish CO2 Sensors
     sendHA_Discovery_Packet(F("sensor/"), F("CO2 Reduction"), F("/co2reduction"), F("t"), F("co2reduction"), F("tons"), F("power"));
