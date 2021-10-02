@@ -2,6 +2,8 @@
 
 #include "settings.h"
 eeprom_settings myConfig;
+char baseMacChr[13] = {0};
+bool isWrittingEEPROM = false;
 
 uint32_t calculateCRC32(const uint8_t *data, size_t length)
 {
@@ -24,12 +26,35 @@ uint32_t calculateCRC32(const uint8_t *data, size_t length)
 }
 
 void WriteConfigToEEPROM() {
+  isWrittingEEPROM = true;
+
   uint32_t checksum = calculateCRC32((uint8_t*)&myConfig, sizeof(eeprom_settings));
-   
+  uint32_t existingChecksum;
+  
   EEPROM.begin(EEPROM_storageSize);
+  EEPROM.get(EEPROM_CHECKSUM_ADDRESS, existingChecksum);
+  
+  if (checksum == existingChecksum)
+  {
+    //No changes have been made - return
+    EEPROM.end();
+#ifdef DEBUG
+    Serial.println(F("No Changes Made - Not Saving EEPROM"));
+#endif
+
+    isWrittingEEPROM = false;
+    return;
+  }
+
   EEPROM.put(EEPROM_CONFIG_ADDRESS, myConfig);
   EEPROM.put(EEPROM_CHECKSUM_ADDRESS, checksum);
   EEPROM.end();
+
+#ifdef DEBUG
+    Serial.println(F("Saving EEPROM"));
+#endif
+
+  isWrittingEEPROM = false;
 }
 
 bool LoadConfigFromEEPROM() {
@@ -44,8 +69,10 @@ bool LoadConfigFromEEPROM() {
   // Calculate the checksum of an entire buffer at once.
   uint32_t checksum = calculateCRC32((uint8_t*)&restoredConfig, sizeof(eeprom_settings));
 
+#ifdef DEBUG
   Serial.println(checksum, HEX);
   Serial.println(existingChecksum, HEX);
+#endif
 
   if (checksum == existingChecksum) {
     //Clone the config into our global variable and return all OK
@@ -53,41 +80,35 @@ bool LoadConfigFromEEPROM() {
     return true;
   }
 
-  
+#ifdef DEBUG
   //Config is not configured or gone bad, return FALSE
-  Serial.println("Config is not configured or gone bad");
+  Serial.println(F("Config is not configured or gone bad"));
+#endif
+
   return false;
 }
 
 void FactoryResetSettings() {
-  const char mqtt_server[] = "192.168.0.254";
-  const char mqtt_username[]="username";
-  const char mqtt_password[]="password";
-  const char mqtt_topic[]="topic";
+  strcpy(myConfig.influxdb_host    , DEFAULT_INFLUXDB_HOST );
+  strcpy(myConfig.influxdb_database, DEFAULT_INFLUXDB_DATABASE );
+  strcpy(myConfig.influxdb_user    , DEFAULT_INFLUXDB_USER );
+  strcpy(myConfig.influxdb_password, DEFAULT_INFLUXDB_PASSWORD );
+
+  myConfig.influxdb_enabled  = false;
+  myConfig.influxdb_httpPort = DEFAULT_INFLUXDB_PORT;
+
+  strcpy(myConfig.mqtt_server  , DEFAULT_MQTT_SERVER );
+  strcpy(myConfig.mqtt_username, DEFAULT_MQTT_USERNAME);
+  strcpy(myConfig.mqtt_password, DEFAULT_MQTT_PASSWORD);
+  strcpy(myConfig.mqtt_topic   , DEFAULT_MQTT_TOPIC);
   
-  const char influxdb_host[] = "192.168.0.254";
-  const char influxdb_database[] = "powerwall";
-  const char influxdb_user[] = "username";
-  const char influxdb_password[] = "password";
+  myConfig.MQTT_Enable =false;
+  myConfig.mqtt_port   = DEFAULT_MQTT_PORT;
 
-  strcpy(myConfig.influxdb_host, influxdb_host );
-  strcpy(myConfig.influxdb_database, influxdb_database );
-  strcpy(myConfig.influxdb_user, influxdb_user );
-  strcpy(myConfig.influxdb_password, influxdb_password );
-
-  myConfig.influxdb_enabled=false;
-  myConfig.influxdb_httpPort=8086;
-
-  strcpy(myConfig.mqtt_server, mqtt_server );
-  strcpy(myConfig.mqtt_username, mqtt_username);
-  strcpy(myConfig.mqtt_password, mqtt_password);
-  strcpy(myConfig.mqtt_topic, mqtt_topic);
+  myConfig.HADiscovery_Enable = false;
   
-  myConfig.MQTT_Enable=false;
-  myConfig.mqtt_port = 1883;
-
-  myConfig.Device_ID=1;
-  myConfig.Device_BAUD=115200;
+  myConfig.Device_ID   = DEFAULT_DEVICE_ID;
+  myConfig.Device_BAUD = DEFAULT_SERIAL_BAUD;
   
   WriteConfigToEEPROM();
 }
