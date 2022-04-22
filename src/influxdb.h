@@ -31,7 +31,7 @@ void Influxdb_postData() {
   poststring.concat(live.l.bV /100.f);
   poststring.concat(F("\nBattery-Amp value="));
   poststring.concat(live.l.bI /100.f);
-  poststring.concat(F("\nBatter-Watt value="));
+  poststring.concat(F("\nBattery-Watt value="));
   poststring.concat(live.l.bP /100.f);
   poststring.concat(F("\nLoad-Voltage value="));
   poststring.concat(live.l.lV /100.f);
