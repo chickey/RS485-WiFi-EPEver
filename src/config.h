@@ -4,16 +4,16 @@
 #define MAX485_RE         D1  // recv enable
 
 // ModBus Register Locations
-#define LIVE_DATA       0x3100     // start of live-data 
+#define LIVE_DATA       0x3500     // start of live-data 
 #define LIVE_DATA_CNT   16         // 16 regs
 
 // just for reference, not used in code
-#define PANEL_VOLTS     0x00       
-#define PANEL_AMPS      0x01
-#define PANEL_POWER_L   0x02
-#define PANEL_POWER_H   0x03
+#define PANEL_VOLTS     0x3519       
+#define PANEL_AMPS      0x351A
+#define PANEL_POWER_L   0x351B
+#define PANEL_POWER_H   0x351C
 
-#define BATT_VOLTS      0x04
+#define BATT_VOLTS      0x354C
 #define BATT_AMPS       0x05
 #define BATT_POWER_L    0x06
 #define BATT_POWER_H    0x07
@@ -137,6 +137,8 @@ uint16_t BoostDuration;
 uint16_t EQDuration;
 uint16_t BatteryCapactity;
 uint16_t BatteryType;
+
+uint16_t solvolt;
 
 uint16_t Maxinputvolttoday;
 uint16_t Mininputvolttoday;

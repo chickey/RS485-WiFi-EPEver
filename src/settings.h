@@ -64,7 +64,7 @@
 #endif
 
 #ifndef DEFAULT_DEVICE_ID
-  #define DEFAULT_DEVICE_ID      1
+  #define DEFAULT_DEVICE_ID      10
 #endif
 #ifndef DEFAULT_SERIAL_BAUD
   #define DEFAULT_SERIAL_BAUD    115200

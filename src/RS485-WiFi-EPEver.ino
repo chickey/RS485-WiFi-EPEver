@@ -178,20 +178,21 @@ void niceDelay(unsigned long delayTime)
   }
 }
 
-uint16_t ReadTegister(uint16_t Register) {
+uint16_t ReadRegister(uint16_t Register) {
   // Read register at the address passed in
+  uint16_t RegisterValue;
 
-  niceDelay(50);
+  //niceDelay(50);
   node.clearResponseBuffer();
   uint8_t result = node.readInputRegisters(Register, 1);
   if (result == node.ku8MBSuccess)  {
     
-    EQChargeVoltValue = node.getResponseBuffer(0);
+    uint16_t RegisterValue = node.getResponseBuffer(0);
 
 #ifdef DEBUG
     Serial.println(String(node.getResponseBuffer(0)));
 #endif
-  } else  {
+  } else {
 #ifdef DEBUG
     Serial.print(F("Miss read - ")); 
     Serial.print(Register);
@@ -199,7 +200,7 @@ uint16_t ReadTegister(uint16_t Register) {
     Serial.println(result, HEX);
 #endif
   }
-  return result;
+  return RegisterValue;
 }
 
 void ReadValues() {  
@@ -208,7 +209,8 @@ void ReadValues() {
   memset(rtc.buf,0,sizeof(rtc.buf));
   memset(live.buf,0,sizeof(live.buf));
   memset(stats.buf,0,sizeof(stats.buf));
-
+  uint16_t result;
+/*
   // Read registers for clock
   //
   niceDelay(50);
@@ -227,10 +229,10 @@ void ReadValues() {
 #endif
   } 
   if (result==226)     ErrorCounter++;
-  
+  */
   // read LIVE-Data
   // 
-  niceDelay(50);
+  /*niceDelay(50);
   node.clearResponseBuffer();
   result = node.readInputRegisters(LIVE_DATA, LIVE_DATA_CNT);
 
@@ -259,91 +261,20 @@ void ReadValues() {
     Serial.print(F("Miss read statistics, ret val:"));
     Serial.println(result, HEX);
 #endif
-  } 
+  } */
 
-  // BATTERY_TYPE
-  niceDelay(50);
-  node.clearResponseBuffer();
-  result = node.readInputRegisters(BATTERY_TYPE, 1);
-  if (result == node.ku8MBSuccess)  {
-    
-    BatteryType = node.getResponseBuffer(0);
-#ifdef DEBUG
-    Serial.println(String(node.getResponseBuffer(0)));
-#endif
-  } else {
-#ifdef DEBUG
-    Serial.print(F("Miss read BATTERY_TYPE, ret val:"));
-    Serial.println(result, HEX);
-#endif
-  }
+  //New addition
+  // Panel voltage
+  solvolt = ReadRegister(PANEL_VOLTS);
+  BatteryType = ReadRegister(BATTERY_TYPE);
+  EQChargeVoltValue = ReadRegister(EQ_CHARGE_VOLT);
+  ChargeLimitVolt = ReadRegister(CHARGING_LIMIT_VOLT);
+  BatteryCapactity = ReadRegister(BATTERY_CAPACITY);
+  batterySOC = ReadRegister(BATTERY_SOC);
+  loadState = ReadRegister(LOAD_STATE);
+  CCModel = ReadRegister(CCMODEL);
 
-  // EQ_CHARGE_VOLT
-  niceDelay(50);
-  node.clearResponseBuffer();
-  result = node.readInputRegisters(EQ_CHARGE_VOLT, 1);
-  if (result == node.ku8MBSuccess)  {
-    
-    EQChargeVoltValue = node.getResponseBuffer(0);
-#ifdef DEBUG
-    Serial.println(String(node.getResponseBuffer(0)));
-#endif
-  } else {
-#ifdef DEBUG
-    Serial.print(F("Miss read EQ_CHARGE_VOLT, ret val:"));
-    Serial.println(result, HEX);
-#endif
-  }
-
-  // CHARGING_LIMIT_VOLT
-  niceDelay(50);
-  node.clearResponseBuffer();
-  result = node.readInputRegisters(CHARGING_LIMIT_VOLT, 1);
-  if (result == node.ku8MBSuccess)  {
-    
-    ChargeLimitVolt = node.getResponseBuffer(0);
-#ifdef DEBUG
-    Serial.println(String(node.getResponseBuffer(0)));
-#endif
-  } else {
-#ifdef DEBUG
-    Serial.print(F("Miss read CHARGING_LIMIT_VOLT, ret val:"));
-    Serial.println(result, HEX);
-#endif
-  }
-  
-  // Capacity
-  niceDelay(50);
-  node.clearResponseBuffer();
-  result = node.readInputRegisters(BATTERY_CAPACITY, 1);
-  if (result == node.ku8MBSuccess)  {
-    
-    BatteryCapactity = node.getResponseBuffer(0);
-#ifdef DEBUG
-    Serial.println(String(node.getResponseBuffer(0)));
-#endif
-  } else {
-#ifdef DEBUG
-    Serial.print(F("Miss read BATTERY_CAPACITY, ret val:"));
-    Serial.println(result, HEX);
-#endif
-  }
-  
-  
-  // Battery SOC
-  niceDelay(50);
-  node.clearResponseBuffer();
-  result = node.readInputRegisters(BATTERY_SOC, 1);
-  if (result == node.ku8MBSuccess)  {
-    
-    batterySOC = node.getResponseBuffer(0);
-    
-  } else {
-#ifdef DEBUG
-    Serial.print(F("Miss read batterySOC, ret val:"));
-    Serial.println(result, HEX);
-#endif
-  }
+/*  
 
   // Battery Net Current = Icharge - Iload
   niceDelay(50);
@@ -376,21 +307,6 @@ void ReadValues() {
       Serial.println(result, HEX);
  #endif
     }
-  }
-
-  // Read Model
-  niceDelay(50);
-  node.clearResponseBuffer();
-  result = node.readInputRegisters(CCMODEL, 1);
-  if (result == node.ku8MBSuccess)  {
-    
-    CCModel = node.getResponseBuffer(0);
-    
-  } else {
-#ifdef DEBUG
-    Serial.print(F("Miss read Model, ret val:"));
-    Serial.println(result, HEX);
-#endif
   }
     
   // Read Status Flags
@@ -427,6 +343,9 @@ void ReadValues() {
     Serial.println(result, HEX);
 #endif
   }
+
+*/
+
 }
 
 void preTransmission()
@@ -447,7 +366,7 @@ void debug_output(){
   Serial.printf("\n\nTime:  20%02d-%02d-%02d   %02d:%02d:%02d   \n",  rtc.r.y , rtc.r.M , rtc.r.d , rtc.r.h , rtc.r.m , rtc.r.s  );
   
   Serial.print(  F("\nLive-Data:           Volt        Amp       Watt  "));
-  Serial.printf( "\n  Panel:            %7.3f    %7.3f    %7.3f ",  live.l.pV/100.f ,  live.l.pI/100.f ,  live.l.pP/100.0f );
+  Serial.printf( "\n  Panel:            %7.3f    %7.3f    %7.3f ",  solvolt/100.f ,  live.l.pI/100.f ,  live.l.pP/100.0f );
   Serial.printf( "\n  Batt:             %7.3f    %7.3f    %7.3f ",  live.l.bV/100.f ,  live.l.bI/100.f ,  live.l.bP/100.0f );
   Serial.printf( "\n  Load:             %7.3f    %7.3f    %7.3f \n",  live.l.lV/100.f ,  live.l.lI/100.f ,  live.l.lP/100.0f );
   Serial.printf( "\n  Battery Current:  %7.3f  A ",      batteryCurrent/100.f  );
@@ -515,7 +434,7 @@ void loop(void) {
   ESPUI.updateControlValue(LoadStatus , String(loadState==1?F(" On"):F("Off")));
   ESPUI.updateControlValue(DeviceTemp , String(batt_temp_status[status_batt.temp]));
   
-  buffer.concat(live.l.pV/100.f); buffer.concat(F("V"));
+  buffer.concat(solvolt/100.f); buffer.concat(F("V"));
   ESPUI.updateControlValue(SolarVoltage , buffer);
 
   buffer.clear(); buffer.concat(live.l.pI/100.f); buffer.concat(F("A"));
@@ -524,7 +443,7 @@ void loop(void) {
   buffer.clear(); buffer.concat(live.l.pP/100.0f); buffer.concat(F("w"));
   ESPUI.updateControlValue(SolarWattage , buffer);
   
-  buffer.clear(); buffer.concat(live.l.bV/100.f); buffer.concat(F("V"));
+  buffer.clear(); buffer.concat(solvolt/100.f); buffer.concat(F("V"));
   ESPUI.updateControlValue(BatteryVoltage  , buffer);
   
   buffer.clear(); buffer.concat(live.l.bI/100.f); buffer.concat(F("A"));
@@ -601,10 +520,10 @@ void loop(void) {
     node.writeSingleCoil(0x0002, loadState);
 
 #ifdef DEBUG
-    if (result != node.ku8MBSuccess)  {
+    /*if (result != node.ku8MBSuccess)  {
       Serial.print(F("Miss write loadState, ret val:"));
       Serial.println(result, HEX);
-    }
+    }*/
 #endif
 
     //reset the transmission timer to avoid publishing twice
