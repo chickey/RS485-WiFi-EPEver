@@ -1,0 +1,343 @@
+esphome:
+  name: epever-upower
+  friendly_name: epever-upower
+
+esp8266:
+  board: d1_mini
+
+# Enable logging
+logger:
+
+uart:
+  id: mod_bus
+  tx_pin: TX
+  rx_pin: RX
+  baud_rate: 115200
+  stop_bits: 1
+
+modbus:
+  flow_control_pin: D1
+  id: modbus1
+  send_wait_time: 200ms
+
+modbus_controller:
+  - id: epever
+    ## the Modbus device addr
+    address: 0x1
+    modbus_id: modbus1
+    setup_priority: -10
+    command_throttle: 200ms
+    update_interval: 30s
+
+text_sensor:
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    name: "rtc_clock"
+    id: rtc_clock
+    internal: true
+    register_type: holding
+    address: 0x9013
+    register_count: 3
+    raw_encode: HEXBYTES
+    response_size: 6
+    #                /*
+    #                E20 Real time clock 9013 D7-0 Sec, D15-8 Min
+    #                E21 Real time clock 9014 D7-0 Hour, D15-8 Day
+    #                E22 Real time clock 9015 D7-0 Month, D15-8 Year
+    #                */
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGV("main", "decoding rtc hex encoded raw data: %s", x.c_str());
+            uint8_t h=0,m=0,s=0,d=0,month_=0,y = 0 ;
+            m = esphome::modbus_controller::byte_from_hex_str(x,0);
+            s = esphome::modbus_controller::byte_from_hex_str(x,1);
+            d = esphome::modbus_controller::byte_from_hex_str(x,2);
+            h = esphome::modbus_controller::byte_from_hex_str(x,3);
+            y = esphome::modbus_controller::byte_from_hex_str(x,4);
+            month_ = esphome::modbus_controller::byte_from_hex_str(x,5);
+            // Now check if the rtc time of the controller is ok and correct it
+            time_t now = ::time(nullptr);
+            struct tm *time_info = ::localtime(&now);
+            int seconds = time_info->tm_sec;
+            int minutes = time_info->tm_min;
+            int hour = time_info->tm_hour;
+            int day = time_info->tm_mday;
+            int month = time_info->tm_mon + 1;
+            int year = time_info->tm_year % 100;
+            // correct time if needed (ignore seconds)
+            if (d != day || month_ != month || y != year || h != hour || m != minutes) {
+              // create the payload
+              std::vector<uint16_t> rtc_data = {uint16_t((minutes << 8) | seconds), uint16_t((day << 8) | hour),
+                                                uint16_t((year << 8) | month)};
+              // Create a modbus command item with the time information as the payload
+              esphome::modbus_controller::ModbusCommandItem set_rtc_command = esphome::modbus_controller::ModbusCommandItem::create_write_multiple_command(epever, 0x9013, 3, rtc_data);
+              // Submit the command to the send queue
+              epever->queue_command(set_rtc_command);
+              ESP_LOGI("ModbusLambda", "EPSOLAR RTC set to %02d:%02d:%02d %02d.%02d.%04d", hour, minutes, seconds, day, month, year + 2000);
+            }
+            char buffer[20];
+            // format time as YYYY-mm-dd hh:mm:ss
+            sprintf(buffer,"%04d-%02d-%02d %02d:%02d:%02d",y+2000,month_,d,h,m,s);
+            id(template_rtc).publish_state(buffer);
+
+  - platform: template
+    name: "RTC Time Sensor"
+    id: template_rtc
+
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    name: "rtc clock test 2"
+    id: rtc_clock_test2
+    internal: true
+    register_type: holding
+    address: 0x9013
+    register_count: 3
+    raw_encode: HEXBYTES
+    response_size: 6
+
+switch:
+  #- platform: modbus_controller
+  #  modbus_controller_id: epever
+  #  id: reset_to_fabric_default
+  #  name: "Reset to Factory Default"
+  #  register_type: coil
+  #  address: 0x15
+  #  bitmask: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: manual_control_load
+    register_type: coil
+    address: 2
+    name: "manual control the load"
+    bitmask: 1
+    
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: charge_from_grid
+    name: "Charge from grid"
+    address: 0x9607
+    register_type: holding
+    # 1:Solar Priority, 2:Utility & Solar, 3:Solar
+    #command_on: 0x2
+    #command_off: 0x3
+
+sensor:
+  #- platform: modbus_controller
+  #  modbus_controller_id: epever
+  #  id: pv_input_voltage
+  #  name: "PV array input voltage"
+  #  address: 0x3100
+  #  unit_of_measurement: "V" ## for any other unit the value is returned in minutes
+  #  register_type: read
+  #  value_type: U_WORD
+  #  accuracy_decimals: 1
+  #  filters:
+  #    - multiply: 0.01
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: inverter_bypass
+    name: "Inverter Bypass"
+    # 0:NoBypass, 1:Bypass 
+    address: 0x2100
+    register_type: discrete_input
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+      # Utility
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: grid_voltage
+    name: "Grid Voltage"
+    unit_of_measurement: V
+    address: 0x3500
+    register_type: read
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01      
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: grid_current
+    name: "Grid Current"
+    unit_of_measurement: A
+    address: 0x3501
+    register_type: read
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01 
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: grid_power
+    name: "Grid Power"
+    unit_of_measurement: W
+    address: 0x3502
+    register_type: read
+    accuracy_decimals: 0
+    filters:
+      - multiply: 0.1
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: grid_state
+    name: "Grid State"
+    # 0:Normal, 1:Low input; 2:High input, 3: No connected
+    address: 0x3511
+    register_type: read
+
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: grid_total
+    name: "Grid Total"
+    unit_of_measurement: kWh
+    address: 0x350F
+    register_type: read
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+    # PV Array
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: pv_voltage
+    name: "PV Voltage"
+    unit_of_measurement: V
+    address: 0x3549
+    register_type: read
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: pv_current
+    name: "PV Current"
+    unit_of_measurement: A
+    address: 0x354A
+    register_type: read
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: pv_power
+    name: "PV Power"
+    unit_of_measurement: W
+    address: 0x354B
+    register_type: read
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: pv_total
+    name: "PV Total"
+    unit_of_measurement: kWh
+    address: 0x3557
+    register_type: read
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+    # Load
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: load_voltage
+    name: "Load Voltage"
+    unit_of_measurement: V
+    address: 0x3521
+    register_type: read
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01     
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: load_current
+    name: "Load Current"
+    unit_of_measurement: A
+    address: 0x3522
+    register_type: read
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01 
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: load_total
+    name: "Load Total"
+    unit_of_measurement: kWh
+    address: 0x3530
+    register_type: read
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01 
+    # Battery
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: battery_voltage
+    name: "Battery Voltage"
+    unit_of_measurement: V
+    address: 0x3580
+    register_type: read
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01     
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: battery_current
+    name: "Battery Current"
+    unit_of_measurement: A
+    address: 0x3581
+    register_type: read
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01 
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: battery_capacity
+    name: "Battery Capacity"
+    unit_of_measurement: "%"
+    address: 0x3586
+    register_type: read
+    accuracy_decimals: 1
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: battery_temp
+    name: "Battery Temp"
+    unit_of_measurement: "°C"
+    address: 0x3512
+    register_type: read
+    filters:
+      - multiply: 0.01
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: battery_state
+    name: "Battery State"
+    # 0:Normal, 1:Overvoltage, 2:Undervoltage, 3:Undervoltage Disconnect, 4:Fault 
+    address: 0x3589
+    register_type: read
+  - platform: modbus_controller
+    modbus_controller_id: epever
+    id: charging_mode
+    name: "Charging Mode"
+    address: 0x9607
+    register_type: holding
+  
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "Qe6Y3FaoxNhQIltffbHTaTd/XgM7y3j9W3tSO46wu4A="
+
+ota:
+  password: "1876349ef83259523a36893c241d1ad2"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Epever Fallback Hotspot"
+    password: "69fYokgtS49H"
+
+captive_portal:
+
+web_server:
+  port: 80
+    
