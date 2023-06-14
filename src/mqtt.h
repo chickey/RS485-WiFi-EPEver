@@ -117,7 +117,9 @@ void mqtt_publish_old() {
   mqtt_publish_f( buf, live.l.bI /100.f);
   sprintf(buf,"%s/battery/P",myConfig.mqtt_topic);
   mqtt_publish_f( buf, live.l.bP /100.f);
-  
+  sprintf(buf,"%s/battery/T",myConfig.mqtt_topic);
+  mqtt_publish_f( buf, live.l.bT /100.f);  
+
   sprintf(buf,"%s/load/V",myConfig.mqtt_topic);  
   mqtt_publish_f( buf, live.l.lV /100.f);
   sprintf(buf,"%s/load/I",myConfig.mqtt_topic);
@@ -210,6 +212,8 @@ void mqtt_publish() {
   panelDoc[F("maxV")] = stats.s.bVmax /100.f;
   panelDoc[F("SOC")] = batterySOC/1.0f;
   panelDoc[F("netI")] = batteryCurrent/100.0f;
+  panelDoc[F("T")] = live.l.bT /100.f;
+
 
   sprintf_P(mqtt_topic, PSTR("%s/battery"), myConfig.mqtt_topic);
   jsonLength = serializeJson(panelDoc, buf);

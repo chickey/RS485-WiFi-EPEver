@@ -5,7 +5,7 @@
 
 // ModBus Register Locations
 #define LIVE_DATA       0x3100     // start of live-data 
-#define LIVE_DATA_CNT   16         // 16 regs
+#define LIVE_DATA_CNT   17         // 17 regs
 
 // just for reference, not used in code
 #define PANEL_VOLTS     0x00       
@@ -190,9 +190,10 @@ uint16_t EQChargeVoltValue;
       int16_t  lV;
       int16_t  lI;
       int32_t  lP; 
+      int16_t bT;
 
     } l;
-    uint16_t  buf[16];
+    uint16_t  buf[17];
   } live;
 
 
