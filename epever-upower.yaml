@@ -120,21 +120,14 @@ switch:
     address: 0x9607
     register_type: holding
     # 1:Solar Priority, 2:Utility & Solar, 3:Solar
-    #command_on: 0x2
-    #command_off: 0x3
+    write_lambda: |-
+      ESP_LOGD("main","Modbus Switch incoming state = %f",x);
+      // return false ; // use this to just change the value
+      payload.push_back(0x2);  // On
+      payload.push_back(0x3);  // Off
+      return true;
 
 sensor:
-  #- platform: modbus_controller
-  #  modbus_controller_id: epever
-  #  id: pv_input_voltage
-  #  name: "PV array input voltage"
-  #  address: 0x3100
-  #  unit_of_measurement: "V" ## for any other unit the value is returned in minutes
-  #  register_type: read
-  #  value_type: U_WORD
-  #  accuracy_decimals: 1
-  #  filters:
-  #    - multiply: 0.01
   - platform: modbus_controller
     modbus_controller_id: epever
     id: inverter_bypass
@@ -145,7 +138,8 @@ sensor:
   - platform: wifi_signal
     name: "WiFi Signal"
     update_interval: 60s
-      # Utility
+    
+    # Utility
   - platform: modbus_controller
     modbus_controller_id: epever
     id: grid_voltage
@@ -183,7 +177,6 @@ sensor:
     # 0:Normal, 1:Low input; 2:High input, 3: No connected
     address: 0x3511
     register_type: read
-
   - platform: modbus_controller
     modbus_controller_id: epever
     id: grid_total
@@ -194,6 +187,7 @@ sensor:
     accuracy_decimals: 2
     filters:
       - multiply: 0.01
+
     # PV Array
   - platform: modbus_controller
     modbus_controller_id: epever
@@ -235,6 +229,7 @@ sensor:
     accuracy_decimals: 2
     filters:
       - multiply: 0.01
+    
     # Load
   - platform: modbus_controller
     modbus_controller_id: epever
@@ -266,6 +261,7 @@ sensor:
     accuracy_decimals: 2
     filters:
       - multiply: 0.01 
+    
     # Battery
   - platform: modbus_controller
     modbus_controller_id: epever
