@@ -3,11 +3,11 @@ esphome:
   friendly_name: epever
 
 esp8266:
-  #board: esp01_1m
   board: d1_mini
 
 # Enable logging
 logger:
+  baud_rate: 0
 
 uart:
   id: mod_bus
@@ -33,69 +33,51 @@ modbus_controller:
 text_sensor:
   - platform: modbus_controller
     modbus_controller_id: epever
-    name: "rtc_clock"
-    id: rtc_clock
-    internal: true
-    register_type: holding
-    address: 0x9013
-    register_count: 3
+    name: "Charging Mode"
+    id: chg_mode
+    address: 0x3201
+    register_type: read
     raw_encode: HEXBYTES
-    response_size: 6
-    #                /*
-    #                E20 Real time clock 9013 D7-0 Sec, D15-8 Min
-    #                E21 Real time clock 9014 D7-0 Hour, D15-8 Day
-    #                E22 Real time clock 9015 D7-0 Month, D15-8 Year
-    #                */
-    on_value:
-      then:
-        - lambda: |-
-            ESP_LOGV("main", "decoding rtc hex encoded raw data: %s", x.c_str());
-            uint8_t h=0,m=0,s=0,d=0,month_=0,y = 0 ;
-            m = esphome::modbus_controller::byte_from_hex_str(x,0);
-            s = esphome::modbus_controller::byte_from_hex_str(x,1);
-            d = esphome::modbus_controller::byte_from_hex_str(x,2);
-            h = esphome::modbus_controller::byte_from_hex_str(x,3);
-            y = esphome::modbus_controller::byte_from_hex_str(x,4);
-            month_ = esphome::modbus_controller::byte_from_hex_str(x,5);
-            // Now check if the rtc time of the controller is ok and correct it
-            time_t now = ::time(nullptr);
-            struct tm *time_info = ::localtime(&now);
-            int seconds = time_info->tm_sec;
-            int minutes = time_info->tm_min;
-            int hour = time_info->tm_hour;
-            int day = time_info->tm_mday;
-            int month = time_info->tm_mon + 1;
-            int year = time_info->tm_year % 100;
-            // correct time if needed (ignore seconds)
-            if (d != day || month_ != month || y != year || h != hour || m != minutes) {
-              // create the payload
-              std::vector<uint16_t> rtc_data = {uint16_t((minutes << 8) | seconds), uint16_t((day << 8) | hour),
-                                                uint16_t((year << 8) | month)};
-              // Create a modbus command item with the time information as the payload
-              esphome::modbus_controller::ModbusCommandItem set_rtc_command = esphome::modbus_controller::ModbusCommandItem::create_write_multiple_command(epever, 0x9013, 3, rtc_data);
-              // Submit the command to the send queue
-              epever->queue_command(set_rtc_command);
-              ESP_LOGI("ModbusLambda", "EPSOLAR RTC set to %02d:%02d:%02d %02d.%02d.%04d", hour, minutes, seconds, day, month, year + 2000);
-            }
-            char buffer[20];
-            // format time as YYYY-mm-dd hh:mm:ss
-            sprintf(buffer,"%04d-%02d-%02d %02d:%02d:%02d",y+2000,month_,d,h,m,s);
-            id(template_rtc).publish_state(buffer);
-
-  - platform: template
-    name: "RTC Time Sensor"
-    id: template_rtc
-
+    
+    lambda: |-
+      uint16_t orig_var, local_var = modbus_controller::word_from_hex_str(x, 0);
+      //ESP_LOGI("mprowe", "The value of local_var is: %d", local_var);
+      orig_var = local_var;
+      local_var = local_var >> 2;
+      //ESP_LOGI("mprowe", "local_var right shift 2 is: %d", local_var);
+      local_var = local_var & 0x03;
+      charger_status[3] = local_var;
+      //ESP_LOGI("mprowe", "local_var & 0x03 is: %d", local_var);
+      switch (local_var) {
+        case 0: return std::string("Not Charging");
+        case 1: return std::string("Float Charging");
+        case 2: return std::string("Boost Charging");
+        case 3: return std::string("Equalizing");
+        default: return std::string("Unknown");
+      }
   - platform: modbus_controller
     modbus_controller_id: epever
-    name: "rtc clock test 2"
-    id: rtc_clock_test2
-    internal: true
-    register_type: holding
-    address: 0x9013
-    register_count: 3
+    name: "Battery Status"
+    id: battery_status
+    address: 0x3200
+    register_type: read
     raw_encode: HEXBYTES
-    response_size: 6
+    
+    lambda: |-
+      uint16_t local_var = modbus_controller::word_from_hex_str(x, 0);
+      //ESP_LOGI("mprowe", "The value of local_var is: %d", local_var);
+      local_var = local_var >> 2;
+      //ESP_LOGI("mprowe", "local_var right shift 2 is: %d", local_var);
+      local_var = local_var & 0x03;
+      //ESP_LOGI("mprowe", "local_var & 0x03 is: %d", local_var);
+      switch (local_var) {
+        case 1: return std::string("Overvolt");
+        case 0: return std::string("Normal");
+        case 2: return std::string("Under Volt");
+        case 3: return std::string("Low Volt Disconnect");
+        case 4: return std::string("Faulkt");        
+        default: return std::string("Unknown");
+      }
 
 switch:
   #- platform: modbus_controller
@@ -119,12 +101,26 @@ sensor:
     name: "WiFi Signal"
     update_interval: 60s
 
+- platform: modbus_controller
+    modbus_controller_id: epever
+    id: generated_energy_today
+    name: "Generated energy today"
+    address: 0x330C
+    device_class: power
+    unit_of_measurement: "W"
+    register_type: read
+    value_type: U_WORD
+    accuracy_decimals: 1
+    #filters:
+    #  - multiply: 0.01
+
   - platform: modbus_controller
     modbus_controller_id: epever
     id: pv_input_voltage
     name: "PV array input voltage"
     address: 0x3100
-    unit_of_measurement: "V" ## for any other unit the value is returned in minutes
+    device_class: voltage
+    unit_of_measurement: "V"
     register_type: read
     value_type: U_WORD
     accuracy_decimals: 1
@@ -136,7 +132,8 @@ sensor:
     id: pv_input_current
     name: "PV array input current"
     address: 0x3101
-    unit_of_measurement: "A" ## for any other unit the value is returned in minutes
+    device_class: current
+    unit_of_measurement: "A"
     register_type: read
     value_type: U_WORD
     accuracy_decimals: 2
@@ -148,7 +145,8 @@ sensor:
     id: pv_input_power
     name: "PV array input power"
     address: 0x3102
-    unit_of_measurement: "W" ## for any other unit the value is returned in minutes
+    device_class: power
+    unit_of_measurement: "W"
     register_type: read
     value_type: U_DWORD_R
     accuracy_decimals: 1
@@ -157,9 +155,10 @@ sensor:
 
   - platform: modbus_controller
     modbus_controller_id: epever
-    id: charging_voltage
-    name: "Charging voltage"
+    id: battery_voltage
+    name: "Battery voltage"
     address: 0x3104
+    device_class: voltage
     unit_of_measurement: "V"
     register_type: read
     value_type: U_WORD
@@ -172,6 +171,7 @@ sensor:
     id: charging_current
     name: "Charging current"
     address: 0x3105
+    device_class: current
     unit_of_measurement: "A"
     register_type: read
     value_type: U_WORD
@@ -184,6 +184,7 @@ sensor:
     id: charging_power
     name: "Charging power"
     address: 0x3106
+    device_class: power
     unit_of_measurement: "W"
     register_type: read
     value_type: U_DWORD_R
@@ -196,6 +197,7 @@ sensor:
     id: load_voltage
     name: "Load voltage"
     address: 0x310C
+    device_class: voltage
     unit_of_measurement: "V"
     register_type: read
     value_type: U_WORD
@@ -208,6 +210,7 @@ sensor:
     id: load_current
     name: "Load Current"
     address: 0x310D
+    device_class: current
     unit_of_measurement: "A"
     register_type: read
     value_type: U_WORD
@@ -220,6 +223,7 @@ sensor:
     id: load_power
     name: "Load power"
     address: 0x310E
+    device_class: power
     unit_of_measurement: "W"
     register_type: read
     value_type: U_DWORD_R
@@ -232,6 +236,7 @@ sensor:
     id: battery_temperature
     name: "Battery temperature"
     address: 0x3110
+    device_class: temperature
     unit_of_measurement: °C
     register_type: read
     value_type: S_WORD
@@ -244,6 +249,7 @@ sensor:
     id: device_temperature
     name: "Device temperature"
     address: 0x3111
+    device_class: temperature
     unit_of_measurement: °C
     register_type: read
     value_type: S_WORD
@@ -256,16 +262,8 @@ sensor:
     id: battery_soc
     name: "Battery SOC"
     address: 0x311A
+    device_class: battery
     unit_of_measurement: "%"
-    register_type: read
-    value_type: U_WORD
-    accuracy_decimals: 0
-
-  - platform: modbus_controller
-    modbus_controller_id: epever
-    id: Charger_status
-    name: "Charger status"
-    address: 0x3201
     register_type: read
     value_type: U_WORD
     accuracy_decimals: 0
