@@ -28,6 +28,7 @@
 #define RTC_CLOCK           0x9013  // D7-0 Sec, D15-8 Min  :   D7-0 Hour, D15-8 Day  :  D7-0 Month, D15-8 Year
 #define RTC_CLOCK_CNT       3       // 3 regs
 
+#define DEVICE_TEMP         0x3111  // Device temperature
 #define BATTERY_SOC         0x311A  // State of Charge in percent, 1 reg
 
 #define BATTERY_CURRENT_L   0x331B  // Battery current L
@@ -100,7 +101,7 @@ uint16_t LoadStatus;
 uint16_t LoadSwitchstate;
 uint16_t Status;
 uint16_t TPPassthrough;
-uint16_t DeviceTemp;
+uint16_t DeviceTempValue;
 uint16_t MQTTEN;
 uint16_t MQTTIP;
 uint16_t MQTTPORT;
@@ -227,6 +228,7 @@ uint16_t EQChargeVoltValue;
   } stats;
 
   // these are too far away for the union conversion trick
+  uint16_t deviceTemp = 0;
   uint16_t batterySOC = 0;
   int32_t  batteryCurrent = 0;
     

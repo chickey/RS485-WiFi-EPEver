@@ -96,7 +96,10 @@ void mqtt_loadpublish() {
   mqtt_publish_s( buf, (char*) (loadState == 1? "on": "off") );  // pimatic state topic does not work with integers or floats ?!?
 }
 
-void mqtt_publish_old() {
+#define SUBSET 0
+#define COMPLETE 1
+
+void mqtt_publish_old(uint16_t publishAll = COMPLETE) {
   // time
   //
   //sprintf(buf, "20%02d-%02d-%02d %02d:%02d:%02d" , rtc.r.y , rtc.r.M , rtc.r.d , rtc.r.h , rtc.r.m , rtc.r.s);
@@ -127,15 +130,13 @@ void mqtt_publish_old() {
   sprintf(buf,"%s/load/P",myConfig.mqtt_topic);
   mqtt_publish_f( buf, live.l.lP /100.f);
 
-  sprintf(buf,"%s/co2reduction/t",myConfig.mqtt_topic);
-  mqtt_publish_f( buf,  stats.s.c02Reduction/100.f);
   sprintf(buf,"%s/battery/SOC",myConfig.mqtt_topic);
-  mqtt_publish_f( buf,    batterySOC/1.0f);
+  mqtt_publish_f( buf, batterySOC/1.0f);
   sprintf(buf,"%s/battery/netI",myConfig.mqtt_topic);
-  mqtt_publish_f( buf,   batteryCurrent/100.0f);
+  mqtt_publish_f( buf, batteryCurrent/100.0f);
   sprintf(buf,"%s/load/state",myConfig.mqtt_topic);
-  mqtt_publish_s( buf,    (char*) (loadState == 1? "on": "off") );  // pimatic state topic does not work with integers or floats ?!?
-   
+  mqtt_publish_s( buf, (char*) (loadState == 1? "on": "off") );  // pimatic state topic does not work with integers or floats ?!?
+
   sprintf(buf,"%s/battery/minV",myConfig.mqtt_topic);
   mqtt_publish_f( buf,  stats.s.bVmin /100.f);
   sprintf(buf,"%s/battery/maxV",myConfig.mqtt_topic);
@@ -146,23 +147,28 @@ void mqtt_publish_old() {
   sprintf(buf,"%s/panel/maxV",myConfig.mqtt_topic);
   mqtt_publish_f( buf,  stats.s.pVmax /100.f);
 
-  sprintf(buf,"%s/energy/consumed_day",myConfig.mqtt_topic);  
-  mqtt_publish_f( buf,  stats.s.consEnerDay/100.f );
-  sprintf(buf,"%s/energy/consumed_day",myConfig.mqtt_topic);
-  mqtt_publish_f( buf,  stats.s.consEnerMon/100.f );
-  sprintf(buf,"%s/energy/consumed_year",myConfig.mqtt_topic);  
-  mqtt_publish_f( buf,  stats.s.consEnerYear/100.f );
-  sprintf(buf,"%s/energy/consumed_all",myConfig.mqtt_topic);
-  mqtt_publish_f( buf,  stats.s.consEnerTotal/100.f );
+  if (publishAll) {
+    sprintf(buf,"%s/co2reduction/t",myConfig.mqtt_topic);
+    mqtt_publish_f( buf,  stats.s.c02Reduction/100.f);
 
-  sprintf(buf,"%s/energy/generated_day",myConfig.mqtt_topic);
-  mqtt_publish_f( buf,  stats.s.genEnerDay/100.f );
-  sprintf(buf,"%s/energy/generated_month",myConfig.mqtt_topic);
-  mqtt_publish_f( buf,  stats.s.genEnerMon/100.f );
-  sprintf(buf,"%s/energy/generated_year",myConfig.mqtt_topic);
-  mqtt_publish_f( buf,  stats.s.genEnerYear/100.f );
-  sprintf(buf,"%s/energy/generated_all",myConfig.mqtt_topic);
-  mqtt_publish_f( buf,   stats.s.genEnerTotal/100.f );
+    sprintf(buf,"%s/energy/consumed_day",myConfig.mqtt_topic);  
+    mqtt_publish_f( buf,  stats.s.consEnerDay/100.f );
+    sprintf(buf,"%s/energy/consumed_day",myConfig.mqtt_topic);
+    mqtt_publish_f( buf,  stats.s.consEnerMon/100.f );
+    sprintf(buf,"%s/energy/consumed_year",myConfig.mqtt_topic);  
+    mqtt_publish_f( buf,  stats.s.consEnerYear/100.f );
+    sprintf(buf,"%s/energy/consumed_all",myConfig.mqtt_topic);
+    mqtt_publish_f( buf,  stats.s.consEnerTotal/100.f );
+
+    sprintf(buf,"%s/energy/generated_day",myConfig.mqtt_topic);
+    mqtt_publish_f( buf,  stats.s.genEnerDay/100.f );
+    sprintf(buf,"%s/energy/generated_month",myConfig.mqtt_topic);
+    mqtt_publish_f( buf,  stats.s.genEnerMon/100.f );
+    sprintf(buf,"%s/energy/generated_year",myConfig.mqtt_topic);
+    mqtt_publish_f( buf,  stats.s.genEnerYear/100.f );
+    sprintf(buf,"%s/energy/generated_all",myConfig.mqtt_topic);
+    mqtt_publish_f( buf,   stats.s.genEnerTotal/100.f );
+  }
 
   sprintf(buf,"%s/status/batt_volt",myConfig.mqtt_topic);
   mqtt_publish_s( buf, batt_volt_status[status_batt.volt] );
@@ -173,12 +179,14 @@ void mqtt_publish_old() {
   //mqtt_publish_s( buf, charger_input_status[ charger_input ]  );
   sprintf(buf,"%s/status/charger_mode",myConfig.mqtt_topic);
   mqtt_publish_s(buf, charger_charging_status[charger_mode ] );  
+  sprintf(buf,"%s/status/device_temp",myConfig.mqtt_topic);
+  mqtt_publish_f(buf, deviceTemp/100.0f);
 }
 
-void mqtt_publish() {
+void mqtt_publish(uint16_t publishAll = COMPLETE) {
   // publish via mqtt using simple format
 #ifdef LEGACY_MQTT
-  mqtt_publish_old();
+  mqtt_publish_old(publishAll);
 #endif
 
   // time
@@ -231,29 +239,38 @@ void mqtt_publish() {
   mqtt_client.publish(mqtt_topic, buf, jsonLength);
   panelDoc.clear();
 
-  //co2reduction
-  panelDoc[F("t")] = stats.s.c02Reduction/100.f;
+  if (publishAll){
 
-  sprintf_P(mqtt_topic, PSTR("%s/co2reduction"), myConfig.mqtt_topic);
+    //co2reduction
+    panelDoc[F("t")] = stats.s.c02Reduction/100.f;
+
+    sprintf_P(mqtt_topic, PSTR("%s/co2reduction"), myConfig.mqtt_topic);
+    jsonLength = serializeJson(panelDoc, buf);
+    mqtt_client.publish(mqtt_topic, buf, jsonLength);
+    panelDoc.clear();
+
+    //energy
+    panelDoc[F("consumed_day")] = stats.s.consEnerDay/100.f;
+    panelDoc[F("consumed_month")] = stats.s.consEnerMon/100.f;
+    panelDoc[F("consumed_year")] = stats.s.consEnerYear/100.f;
+    panelDoc[F("consumed_all")] = stats.s.consEnerTotal/100.f;
+
+    panelDoc[F("generated_day")] = stats.s.genEnerDay/100.f;
+    panelDoc[F("generated_month")] = stats.s.genEnerMon/100.f;
+    panelDoc[F("generated_year")] = stats.s.genEnerYear/100.f;
+    panelDoc[F("generated_all")] = stats.s.genEnerTotal/100.f;
+
+    sprintf_P(mqtt_topic, PSTR("%s/energy"), myConfig.mqtt_topic);
+    jsonLength = serializeJson(panelDoc, buf);
+    mqtt_client.publish(mqtt_topic, buf, jsonLength);
+    panelDoc.clear();
+  }
+
+  // device temperature
+  panelDoc[F("device_temp")] = deviceTemp/100.0f;
+  sprintf_P(mqtt_topic, PSTR("%s/status"), myConfig.mqtt_topic);
   jsonLength = serializeJson(panelDoc, buf);
   mqtt_client.publish(mqtt_topic, buf, jsonLength);
-  panelDoc.clear();
-
-  //energy
-  panelDoc[F("consumed_day")] = stats.s.consEnerDay/100.f;
-  panelDoc[F("consumed_month")] = stats.s.consEnerMon/100.f;
-  panelDoc[F("consumed_year")] = stats.s.consEnerYear/100.f;
-  panelDoc[F("consumed_all")] = stats.s.consEnerTotal/100.f;
-
-  panelDoc[F("generated_day")] = stats.s.genEnerDay/100.f;
-  panelDoc[F("generated_month")] = stats.s.genEnerMon/100.f;
-  panelDoc[F("generated_year")] = stats.s.genEnerYear/100.f;
-  panelDoc[F("generated_all")] = stats.s.genEnerTotal/100.f;
-
-  sprintf_P(mqtt_topic, PSTR("%s/energy"), myConfig.mqtt_topic);
-  jsonLength = serializeJson(panelDoc, buf);
-  mqtt_client.publish(mqtt_topic, buf, jsonLength);
-  panelDoc.clear();
 
   //status
   panelDoc[F("batt_volt")] = batt_volt_status[status_batt.volt];
@@ -382,6 +399,8 @@ void publishHADiscovery()
     sendHA_Discovery_Packet(F("sensor/"), F("Battery Temperature"), F("/status"), F("batt_temp"), F("battTemp"), F("C"), F("temperature"));
     sendHA_Discovery_Packet(F("sensor/"), F("Battery Voltage"), F("/status"), F("batt_volt"), F("battVolt"));
     sendHA_Discovery_Packet(F("sensor/"), F("Charger Mode"), F("/status"), F("charger_mode"), F("chargeMode"));
+    //Publish Device temperature Sensors
+    sendHA_Discovery_Packet(F("sensor/"), F("Device Temperature"), F("/status"), F("device_temp"), F("deviceTemp"), F("C"), F("temperature"));
 
     //Publish Restart Switch
     sendHA_Discovery_Packet(F("switch/"), F("Restart"), F("/load"), F("state"), F("restart"), 0 ,0 ,F("/control"), F("restart"), F(""));
