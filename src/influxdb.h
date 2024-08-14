@@ -39,6 +39,8 @@ void Influxdb_postData() {
   poststring.concat(live.l.lI /100.f);
   poststring.concat(F("\nLoad-Watt value="));
   poststring.concat(live.l.lP /100.f);
+  poststring.concat(F("\nDevice temp value="));
+  poststring.concat(deviceTemp/100.0f);
   poststring.concat(F("\nBattery-Current value="));
   poststring.concat(batteryCurrent/100.f);
   poststring.concat(F("\nBattery-SOC value="));

@@ -14,7 +14,7 @@
  *    A big thankyou to the following project for getting me on the right path https://github.com/glitterkitty/EpEverSolarMonitor 
  *    I also couldn't have made this without the ESPUI project.
  *    
- *    Version 0.51
+ *    Version 0.61
  *    
 */
 
@@ -54,10 +54,18 @@ DNSServer dns;
 ModbusMaster node;   // instantiate ModbusMaster object
 
 
-#ifndef TRANSMIT_PERIOD
-  #define TRANSMIT_PERIOD 30000
+#ifndef TRANSMIT_SLOW_PERIOD
+  #define TRANSMIT_SLOW_PERIOD 30000
 #endif
-unsigned long time_now = 0;
+unsigned long time_slow_now = 0;
+#ifndef TRANSMIT_MQTT_PERIOD
+  #define TRANSMIT_MQTT_PERIOD 5000
+#endif
+unsigned long time_mqtt_now = 0;
+#ifndef TRANSMIT_INFLUX_PERIOD
+  #define TRANSMIT_INFLUX_PERIOD 30000
+#endif
+unsigned long time_influx_now = 0;
 
 void setup(void) {
   //Attempt to read settings and if it fails resort to factory defaults
@@ -85,7 +93,7 @@ void setup(void) {
   BatteryStatus = ESPUI.addControl( ControlType::Label, "Battery Status", "4", ControlColor::Emerald, tab1);
   BatteryTemp = ESPUI.addControl( ControlType::Label, "Battery temperature", "0", ControlColor::Emerald, tab1);
   LoadStatus = ESPUI.addControl( ControlType::Label, "Load Status", "Off", ControlColor::Emerald, tab1);
-  DeviceTemp = ESPUI.addControl( ControlType::Label, "Device Temp", "0", ControlColor::Emerald, tab1);
+  DeviceTempValue = ESPUI.addControl( ControlType::Label, "Device temperature", "0", ControlColor::Emerald, tab1);
 
   // Add Historical Data Controls
   Maxinputvolttoday = ESPUI.addControl( ControlType::Label, "Max input voltage today", "0", ControlColor::Emerald, tab2);
@@ -202,53 +210,14 @@ uint16_t ReadTegister(uint16_t Register) {
   return result;
 }
 
-void ReadValues() {  
+void ReadValuesSlow() {  
   // clear old data
   //
-  memset(rtc.buf,0,sizeof(rtc.buf));
-  memset(live.buf,0,sizeof(live.buf));
   memset(stats.buf,0,sizeof(stats.buf));
-
-  // Read registers for clock
-  //
-  niceDelay(50);
-  node.clearResponseBuffer();
-  uint8_t result = node.readHoldingRegisters(RTC_CLOCK, RTC_CLOCK_CNT);
-  if (result == node.ku8MBSuccess)  {
-
-    rtc.buf[0]  = node.getResponseBuffer(0);
-    rtc.buf[1]  = node.getResponseBuffer(1);
-    rtc.buf[2]  = node.getResponseBuffer(2);
-    
-  } else {
-#ifdef DEBUG
-    Serial.print(F("Miss read rtc-data, ret val:"));
-    Serial.println(result, HEX);
-#endif
-  } 
-  if (result==226)     ErrorCounter++;
-  
-  // read LIVE-Data
-  // 
-  niceDelay(50);
-  node.clearResponseBuffer();
-  result = node.readInputRegisters(LIVE_DATA, LIVE_DATA_CNT);
-
-  if (result == node.ku8MBSuccess)  {
-
-    for(uint8_t i=0; i< LIVE_DATA_CNT ;i++) live.buf[i] = node.getResponseBuffer(i);
-       
-  } else {
-#ifdef DEBUG
-    Serial.print(F("Miss read liva-data, ret val:"));
-    Serial.println(result, HEX);
-#endif
-  }
-
   // Statistical Data
   niceDelay(50);
   node.clearResponseBuffer();
-  result = node.readInputRegisters(STATISTICS, STATISTICS_CNT);
+  uint8_t result = node.readInputRegisters(STATISTICS, STATISTICS_CNT);
 
   if (result == node.ku8MBSuccess)  {
     
@@ -328,9 +297,67 @@ void ReadValues() {
     Serial.println(result, HEX);
 #endif
   }
+
+}
+
+void ReadValues() {  
+  // clear old data
+  //
+  memset(rtc.buf,0,sizeof(rtc.buf));
+  memset(live.buf,0,sizeof(live.buf));
+
+  // Read registers for clock
+  //
+  niceDelay(50);
+  node.clearResponseBuffer();
+  uint8_t result = node.readHoldingRegisters(RTC_CLOCK, RTC_CLOCK_CNT);
+  if (result == node.ku8MBSuccess)  {
+
+    rtc.buf[0]  = node.getResponseBuffer(0);
+    rtc.buf[1]  = node.getResponseBuffer(1);
+    rtc.buf[2]  = node.getResponseBuffer(2);
+    
+  } else {
+#ifdef DEBUG
+    Serial.print(F("Miss read rtc-data, ret val:"));
+    Serial.println(result, HEX);
+#endif
+  } 
+  if (result==226)     ErrorCounter++;
   
-  
-  // Battery SOC
+  // read LIVE-Data
+  // 
+  niceDelay(50);
+  node.clearResponseBuffer();
+  result = node.readInputRegisters(LIVE_DATA, LIVE_DATA_CNT);
+
+  if (result == node.ku8MBSuccess)  {
+
+    for(uint8_t i=0; i< LIVE_DATA_CNT ;i++) live.buf[i] = node.getResponseBuffer(i);
+       
+  } else {
+#ifdef DEBUG
+    Serial.print(F("Miss read liva-data, ret val:"));
+    Serial.println(result, HEX);
+#endif
+  }
+
+  // device temperature
+  niceDelay(50);
+  node.clearResponseBuffer();
+  result = node.readInputRegisters(DEVICE_TEMP, 1);
+  if (result == node.ku8MBSuccess)  {
+    
+    deviceTemp = node.getResponseBuffer(0);
+    
+  } else {
+#ifdef DEBUG
+    Serial.print(F("Miss read device temperature, ret val:"));
+    Serial.println(result, HEX);
+#endif
+  }
+
+  // battery SOC
   niceDelay(50);
   node.clearResponseBuffer();
   result = node.readInputRegisters(BATTERY_SOC, 1);
@@ -472,11 +499,6 @@ void debug_output(){
 }
 
 void loop(void) {
-  //check if we should publish the Home Assistant Discovery MQTT packets
-  if (setPublishHADiscovery)
-  {
-    publishHADiscovery();
-  }
 
   String buffer;
   buffer.reserve(64);
@@ -513,9 +535,10 @@ void loop(void) {
 
   //Update ESPUI Live Data components
   ESPUI.updateControlValue(LoadStatus , String(loadState==1?F(" On"):F("Off")));
-  ESPUI.updateControlValue(DeviceTemp , String(batt_temp_status[status_batt.temp]));
-  
-  buffer.concat(live.l.pV/100.f); buffer.concat(F("V"));
+  buffer.clear(); buffer.concat(deviceTemp/100.0f); buffer.concat(F("°C"));
+  ESPUI.updateControlValue(DeviceTempValue , buffer);
+
+  buffer.clear(); buffer.concat(live.l.pV/100.f); buffer.concat(F("V"));
   ESPUI.updateControlValue(SolarVoltage , buffer);
 
   buffer.clear(); buffer.concat(live.l.pI/100.f); buffer.concat(F("A"));
@@ -598,7 +621,7 @@ void loop(void) {
     niceDelay(200);
 #endif
 
-    node.writeSingleCoil(0x0002, loadState);
+    uint8_t result = node.writeSingleCoil(0x0002, loadState);
 
 #ifdef DEBUG
     if (result != node.ku8MBSuccess)  {
@@ -607,12 +630,14 @@ void loop(void) {
     }
 #endif
 
-    //reset the transmission timer to avoid publishing twice
-    time_now += TRANSMIT_PERIOD;
+    //reset the transmission timers to avoid publishing twice
+    time_slow_now += TRANSMIT_SLOW_PERIOD;
+    time_mqtt_now += TRANSMIT_MQTT_PERIOD;
+    time_influx_now += TRANSMIT_INFLUX_PERIOD;
     if (myConfig.MQTT_Enable) {
       // establish/keep mqtt connection
       mqtt_reconnect();
-      mqtt_publish();
+      mqtt_publish(SUBSET);
       mqtt_client.loop();
     }
 
@@ -622,16 +647,38 @@ void loop(void) {
     }
   }
   
-  // Transmit to MQTT/Influx if timer has elapsed.
-  if(millis() >= time_now + TRANSMIT_PERIOD){
-    time_now += TRANSMIT_PERIOD;
+  // read less frequently needed values if timer has elapsed.
+  if(millis() >= time_slow_now + TRANSMIT_SLOW_PERIOD){
+    time_slow_now += TRANSMIT_SLOW_PERIOD;
+    time_mqtt_now += TRANSMIT_MQTT_PERIOD;
+    ReadValuesSlow();
+    // also transmit slow read values
+    if (myConfig.MQTT_Enable) {
+        // establish/keep mqtt connection  
+        mqtt_reconnect();
+        mqtt_publish(COMPLETE);
+        mqtt_client.loop();
+    }
+    //check if we should publish the Home Assistant Discovery MQTT packets
+    if (setPublishHADiscovery)
+    {
+      publishHADiscovery();
+    }
+  }
+  // Transmit to MQTT if timer has elapsed.
+  if(millis() >= time_mqtt_now + TRANSMIT_MQTT_PERIOD){
+    time_mqtt_now += TRANSMIT_MQTT_PERIOD;
 
     if (myConfig.MQTT_Enable) {
         // establish/keep mqtt connection  
         mqtt_reconnect();
-        mqtt_publish();
+        mqtt_publish(SUBSET);
         mqtt_client.loop();
     }
+  }
+  // Transmit to Influx if timer has elapsed.
+  if(millis() >= time_influx_now + TRANSMIT_INFLUX_PERIOD){
+    time_influx_now += TRANSMIT_INFLUX_PERIOD;
 
     // establish/keep influxdb connection
     if(myConfig.influxdb_enabled == 1) {
